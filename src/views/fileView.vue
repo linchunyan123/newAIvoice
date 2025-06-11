@@ -311,7 +311,7 @@ onMounted(() => {
   }
 });
 
-const videoUrl = ref('../../public/vedio/2021届清华美院动画毕设 _《万华镜》——百年党庆，献礼中华五十六个民族.mp4')
+const videoUrl = ref('')
 const videoRef = ref(null);
 const videoRef1 = ref(null);
 const currentVolume = ref(1); // 音量范围是 0~1
