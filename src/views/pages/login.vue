@@ -101,7 +101,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
       const keys =
         permiss.defaultList[param.username == "admin" ? "admin" : "user"];
       permiss.handleSet(keys);
-      router.push("/");
+      router.push("/dashboard");
     } else {
       ElMessage.error("登录失败");
     }

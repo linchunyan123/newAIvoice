@@ -284,6 +284,7 @@ const handleDelete = async (row) => {
       ElMessage.success("删除成功");
       // 重新获取列表数据
       getData();
+      getTaskDEtailINfo()
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {

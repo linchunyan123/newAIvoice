@@ -137,10 +137,10 @@
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
-                <el-button type="primary" @click="toFile(1,id)"><el-icon>
+                <el-button type="primary" @click="toFile(1, scope.row.id)"><el-icon>
                     <Search />
                   </el-icon>文件查看</el-button>
-                <el-button type="warning" @click="toFile(2,id)"><el-icon>
+                <el-button type="warning" @click="toFile(2, scope.row.id)"><el-icon>
                     <MuteNotification />
                   </el-icon>文件降噪</el-button>
               </template>
@@ -439,9 +439,27 @@ const buttons = [{ type: "primary", text: "⬅ 返回任务管理" }] as const;
 import { ElMessage, ElMessageBox } from "element-plus";
 
 // 去文件查看页面
-const toFile = (index,id) => {
-  // console.log(123,index);
-  router.push({ path: "file-view", query: { index,id } });
+const toFile = (index, fileId) => {
+  // 获取当前行的文件信息
+  const fileInfo = tableData.value.find(item => item.id === fileId);
+  console.log('taskOperation页面传递的文件信息：', fileInfo);
+  console.log('当前表格数据：', tableData.value);
+  console.log('要查找的文件id：', fileId);
+  
+  if (!fileInfo) {
+    ElMessage.warning('未找到文件信息');
+    return;
+  }
+  
+  router.push({ 
+    path: "file-view", 
+    query: { 
+      index,
+      id: fileId, // 文件id
+      taskId: fileInfo.tid, // 任务id
+      fileInfo: JSON.stringify(fileInfo) // 将文件信息转换为字符串传递
+    } 
+  });
 };
 // 获取文件详情
 const page = reactive({
@@ -459,10 +477,16 @@ const getTaskDetail1 = async () => {
     
     if (res.data.code === 200) {
       let filteredData = res.data.data.list;
+      let totalData = res.data.data.list; // 保存原始数据用于计算总数
       
       // 处理文件类型筛选
       if (query.fileType === "有效文件") {
         filteredData = filteredData.filter(file => 
+          file.effective_voice && 
+          file.effective_voice !== "0" && 
+          file.effective_voice !== ""
+        );
+        totalData = totalData.filter(file => 
           file.effective_voice && 
           file.effective_voice !== "0" && 
           file.effective_voice !== ""
@@ -474,18 +498,21 @@ const getTaskDetail1 = async () => {
         filteredData = filteredData.filter(file => 
           file.status === query.status
         );
+        totalData = totalData.filter(file => 
+          file.status === query.status
+        );
       }
       
+      // 确保每个文件对象都有id属性
+      filteredData = filteredData.map(file => ({
+        ...file,
+        id: file.id || file.file_id || file.task_id // 尝试不同的可能id字段
+      }));
+      
+      console.log('设置到表格的数据：', filteredData);
       tableData.value = filteredData;
-      
-      // 根据是否有搜索条件来决定显示的总数
-      if (query.fileType === "有效文件" || (query.status && query.status !== "全部")) {
-        // 有搜索条件时，显示筛选后的条数
-        page.total = filteredData.length;
-      } else {
-        // 无搜索条件时，显示服务器返回的总数
-        page.total = res.data.data.total || 0;
-      }
+      // 使用筛选后的数据长度作为总数
+      page.total = totalData.length;
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {

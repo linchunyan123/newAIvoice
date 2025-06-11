@@ -29,9 +29,21 @@
             <div class="fileOriginalTitle">原始文件</div>
             <div class="fileOriginalContent">
               <div class="videoBox">
+                <div v-if="isVideoLoading" class="video-loading">
+                  <el-icon class="loading-icon"><Loading /></el-icon>
+                  <span>视频加载中...</span>
+                </div>
+                <div v-else-if="videoLoadError" class="video-error">
+                  <el-icon class="error-icon"><CircleClose /></el-icon>
+                  <span>视频加载失败</span>
+                  <el-button type="primary" size="small" @click="retryLoadVideo">重试</el-button>
+                </div>
                 <video
                   ref="videoRef"
-                  :src= "videoUrl"
+                  :src="videoUrl"
+                  @loadstart="handleVideoLoadStart"
+                  @loadeddata="handleVideoLoaded"
+                  @error="handleVideoError"
                 >
                   您的浏览器不支持 video 标签。
                 </video>
@@ -125,9 +137,21 @@
             </div>
             <div class="fileReductionContent">
               <div class="videoBox">
+                <div v-if="isVideoLoading" class="video-loading">
+                  <el-icon class="loading-icon"><Loading /></el-icon>
+                  <span>视频加载中...</span>
+                </div>
+                <div v-else-if="videoLoadError" class="video-error">
+                  <el-icon class="error-icon"><CircleClose /></el-icon>
+                  <span>视频加载失败</span>
+                  <el-button type="primary" size="small" @click="retryLoadVideo">重试</el-button>
+                </div>
                 <video
                   ref="videoRef1"
-                  src="../../public/vedio/2021届清华美院动画毕设 _《万华镜》——百年党庆，献礼中华五十六个民族.mp4"
+                  :src="videoUrl"
+                  @loadstart="handleVideoLoadStart"
+                  @loadeddata="handleVideoLoaded"
+                  @error="handleVideoError"
                 >
                   您的浏览器不支持 video 标签。
                 </video>
@@ -209,7 +233,7 @@
       :type="button.type"
       class="returnBtn"
       text
-      @click="router.push({ path: 'task-operation' ,query: { index:4 ,id:id} })"
+      @click="router.push({ path: 'task-operation' ,query: { index:4 ,id:taskId} })"
     >
       {{ button.text }}
     </el-button>
@@ -219,17 +243,106 @@
 <script lang="ts" setup>
 import { ref, computed, reactive, nextTick, onMounted, watch } from "vue";
 import type { TabsPaneContext } from "element-plus";
-import { ArrowDown } from "@element-plus/icons-vue";
+import { ArrowDown, Loading, CircleClose } from "@element-plus/icons-vue";
 import TableSearch from "@/components/operation-search.vue";
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
 const router = useRouter();
-const id = ref(0);
-const videoUrl = '../../public/vedio/2021届清华美院动画毕设 _《万华镜》——百年党庆，献礼中华五十六个民族.mp4'
+const route = useRoute();
+const id = ref<string>('');
+const taskId = ref<string>('');
+const fileInfo = ref(null);
+const activeName = ref('first');
+const activeName1 = ref('first1');
+const activeName2 = ref('first2');
+const activeName3 = ref('first3');
+const percentage = ref(90);
+const getStatus = computed(() => {
+  if (percentage.value === 100) return "success";
+  return ""; // 默认值
+});
+
+// 在组件挂载时获取并解析文件信息
+onMounted(() => {
+  const query = route.query;
+  id.value = query.id as string;
+  taskId.value = query.taskId as string;
+  const index = query.index;
+  
+  // 设置默认标签页
+  if (index == "1") {
+    activeName.value = "first";
+  } else if (index == "2") {
+    activeName.value = "second";
+  } else if (index == "3") {
+    activeName.value = "third";
+  } else {
+    activeName.value = "first";
+  }
+  
+  // 解析传递的文件信息
+  if (query.fileInfo) {
+    try {
+      fileInfo.value = JSON.parse(query.fileInfo as string);
+      console.log('fileView页面接收到的文件信息：', fileInfo.value);
+      console.log('文件ID：', id.value);
+      console.log('任务ID：', taskId.value);
+      
+      // 更新页面显示的文件信息
+      if (fileInfo.value) {
+        // 更新任务名称标签页中的信息
+        const taskInfoItems = document.querySelectorAll('.taskInfoUl li');
+        if (taskInfoItems.length > 0) {
+          taskInfoItems[0].textContent = `文件名称 ${fileInfo.value.filename || '未知'}`;
+          taskInfoItems[1].textContent = `文件大小 ${fileInfo.value.size || '未知'}`;
+          taskInfoItems[2].textContent = `有效时长 ${fileInfo.value.effective_voice || '未知'}`;
+          taskInfoItems[3].textContent = `总时长 ${fileInfo.value.total_voice || '未知'}`;
+          taskInfoItems[4].textContent = `语种 ${fileInfo.value.language || '未知'}`;
+          taskInfoItems[5].textContent = `是否转写 ${fileInfo.value.status === '已转写' ? '是' : '否'}`;
+          taskInfoItems[6].textContent = `是否降噪 ${fileInfo.value.status === '已降噪' ? '是' : '否'}`;
+        }
+        videoUrl.value = fileInfo.value.url;
+        isVideoLoading.value = true;
+        videoLoadError.value = false;
+      }
+    } catch (error) {
+      console.error('解析文件信息失败：', error);
+    }
+  }
+});
+
+const videoUrl = ref('../../public/vedio/2021届清华美院动画毕设 _《万华镜》——百年党庆，献礼中华五十六个民族.mp4')
 const videoRef = ref(null);
 const videoRef1 = ref(null);
 const currentVolume = ref(1); // 音量范围是 0~1
 const currentVolume1 = ref(1); // 音量范围是 0~1
+
+const isVideoLoading = ref(true);
+const videoLoadError = ref(false);
+
+const handleVideoLoadStart = () => {
+  isVideoLoading.value = true;
+  videoLoadError.value = false;
+};
+
+const handleVideoLoaded = () => {
+  isVideoLoading.value = false;
+  videoLoadError.value = false;
+};
+
+const handleVideoError = () => {
+  isVideoLoading.value = false;
+  videoLoadError.value = true;
+};
+
+const retryLoadVideo = () => {
+  if (videoRef.value) {
+    isVideoLoading.value = true;
+    videoLoadError.value = false;
+    videoRef.value.load();
+  }
+};
+
 const playVideo = () => {
   if (videoRef.value) {
     videoRef.value.play();
@@ -255,11 +368,6 @@ const decreaseVolume = () => {
     videoRef.value.volume = currentVolume.value;
   }
 };
-
-// 初始化音量
-watch(videoRef, (el) => {
-  if (el) el.volume = currentVolume.value;
-});
 
 const playVideo1 = () => {
   if (videoRef1.value) {
@@ -287,144 +395,32 @@ const decreaseVolume1 = () => {
   }
 };
 
-// 初始化音量
-watch(videoRef1, (el) => {
-  if (el) el.volume = currentVolume1.value;
-});
-
-const route = useRoute();
-onMounted(() => {
-  const index = route.query.index;
-  id.value = route.query.id;
-  // console.log("查询参数 index:", index);
-  if (index == "1") {
-    activeName.value = "first";
-  } else if (index == "2") {
-    activeName.value = "second";
-  } else if (index == "3") {
-    activeName.value = "third";
-  } else {
-    activeName.value = "first";
-  }
-});
-
-const dialogVisible = ref(false);
-
-const handleClose = (done: () => void) => {
-  ElMessageBox.confirm("Are you sure to close this dialog?")
-    .then(() => {
-      done();
-    })
-    .catch(() => {
-      // catch error
-    });
-};
-import { fetchFileData } from "@/api";
-// 查询相关
-const query = reactive({
-  fileType: "",
-  status: "",
-});
-const handleSearch = () => {
-  console.log("Searching...");
-};
-const searchOpt = ref<FormOptionList[]>([
-  {
-    type: "select",
-    prop: "fileType",
-    placeholder: "文件类型",
-    activeValue: "全部文件",
-    opts: [
-      { label: "全部文件", value: "全部文件" },
-      { label: "有效文件", value: "有效文件" },
-    ],
-  },
-  {
-    type: "select",
-    prop: "status",
-    placeholder: "文件状态/处理",
-    activeValue: "已检测",
-    opts: [
-      { label: "已检测", value: "已检测" },
-      { label: "已转写", value: "已转写" },
-      { label: "已降噪", value: "已降噪" },
-    ],
-  },
-]);
-//下载
-const downType = ref("");
-
-// 分页相关
-let returnData = reactive([]);
-const tableData = ref<User[]>([]);
-const currentPage = ref(1);
-const total = ref(2);
-const pageSize = ref(1);
-const changeSize = (size: number) => {
-  pageSize.value = size;
-  getData();
-};
-const changePage = (page: number) => {
-  currentPage.value = page;
-  getData();
-};
-const getData = async () => {
-  // const res = await fetchFileData();
-  // returnData = res.data.list;
-  // tableData.value = returnData.slice(
-  //   (currentPage.value - 1) * pageSize.value,
-  //   currentPage.value * pageSize.value
-  // );
-  //   page.total = res.data.pageTotal;
-  // page.total = 2;
-  // page.size = 1;
-};
-getData();
-// 进度条相关
-const percentage = ref(90);
-// 状态只能是 '', 'success', 'exception', 'warning'
-const getStatus = computed(() => {
-  if (percentage.value === 100) return "success";
-  return ""; // 默认值
-});
-// const activeName = ref("first");
-const activeName = ref("fourth");
-const activeName1 = ref("first1");
-const activeName2 = ref("first2");
-const activeName3 = ref("first3");
-const activeName4 = ref("first4");
-
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   nextTick(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
-    // console.log(tab, event);
   });
 };
+
 const handleClick1 = (tab: TabsPaneContext, event: Event) => {
   nextTick(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
-    // console.log(tab, event);
   });
 };
+
 const handleClick2 = (tab: TabsPaneContext, event: Event) => {
   nextTick(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
-    // console.log(tab, event);
   });
 };
+
 const handleClick3 = (tab: TabsPaneContext, event: Event) => {
   nextTick(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
-    // console.log(tab, event);
   });
 };
-const handleClick4 = (tab: TabsPaneContext, event: Event) => {
-  nextTick(() => {
-    (document.activeElement as HTMLElement | null)?.blur?.();
-    // console.log(tab, event);
-  });
-};
-const buttons = [{ type: "primary", text: "⬅ 返回任务详情" }] as const;
+
+const buttons = [{ type: "primary", text: "⬅ 返回任务操作" }] as const;
+const dialogVisible = ref(false);
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { UploadProps, UploadUserFile } from "element-plus";
 
@@ -489,12 +485,10 @@ const transcription = () => {
   padding: 20px;
   border-radius: 10px;
   box-sizing: border-box;
-  width: 96%;
-  margin: 0 auto;
-  border: 1px solid #dcdfe6;
-  padding: 20px;
-  border-radius: 10px;
-  box-sizing: border-box;
+  
+  :deep(.el-tabs__content) {
+    padding: 0;
+  }
 }
 .demo-tabs1 > .el-tabs__content {
   color: #6b778c;
@@ -526,6 +520,25 @@ const transcription = () => {
   list-style: none;
   display: flex;
   justify-content: space-between;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  
+  li {
+    flex: 1;
+    text-align: center;
+    padding: 0 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    color: #606266;
+    font-size: 14px;
+    
+    &:not(:last-child) {
+      border-right: 1px solid #EBEEF5;
+    }
+  }
 }
 .fileBox,
 .fileBox2,
@@ -561,10 +574,48 @@ const transcription = () => {
       .videoBox {
         width: 50%;
         margin: 0 auto;
+        position: relative;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
         video {
           width: 100%;
           height: 100%;
           object-fit: contain;
+        }
+        
+        .video-loading,
+        .video-error {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.9);
+          z-index: 1;
+          
+          .loading-icon {
+            font-size: 32px;
+            color: #409EFF;
+            animation: rotating 2s linear infinite;
+          }
+          
+          .error-icon {
+            font-size: 32px;
+            color: #F56C6C;
+            margin-bottom: 10px;
+          }
+          
+          span {
+            margin: 10px 0;
+            color: #606266;
+          }
         }
       }
       .audioTrack {
@@ -620,10 +671,48 @@ const transcription = () => {
       .videoBox {
         width: 50%;
         margin: 0 auto;
+        position: relative;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        
         video {
           width: 100%;
           height: 100%;
           object-fit: contain;
+        }
+        
+        .video-loading,
+        .video-error {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.9);
+          z-index: 1;
+          
+          .loading-icon {
+            font-size: 32px;
+            color: #409EFF;
+            animation: rotating 2s linear infinite;
+          }
+          
+          .error-icon {
+            font-size: 32px;
+            color: #F56C6C;
+            margin-bottom: 10px;
+          }
+          
+          span {
+            margin: 10px 0;
+            color: #606266;
+          }
         }
       }
       .audioTrack {
@@ -711,5 +800,14 @@ const transcription = () => {
   position: absolute;
   bottom: 10px;
   right: 10px;
+}
+
+@keyframes rotating {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
