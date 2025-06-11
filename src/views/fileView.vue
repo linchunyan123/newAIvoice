@@ -14,13 +14,13 @@
         >
           <el-tab-pane label="任务名称" name="first1">
             <ul class="taskInfoUl">
-              <li>文件名称 xx</li>
-              <li>文件大小 1M</li>
-              <li>有效时长 20min</li>
-              <li>总时长 1小时</li>
-              <li>语种 中文</li>
-              <li>是否转写 否</li>
-              <li>是否降噪 否</li>
+              <li>文件名称 {{ fileInfo?.filename || '未知' }}</li>
+              <li>文件大小 {{ fileInfo?.size || '未知' }}</li>
+              <li>有效时长 {{ fileInfo?.effective_voice || '未知' }}</li>
+              <li>总时长 {{ fileInfo?.total_voice || '未知' }}</li>
+              <li>语种 {{ fileInfo?.language || '未知' }}</li>
+              <li>是否转写 {{ fileInfo?.status === '已转写' ? '是' : '否' }}</li>
+              <li>是否降噪 {{ fileInfo?.status === '已降噪' ? '是' : '否' }}</li>
             </ul>
           </el-tab-pane>
         </el-tabs>
@@ -103,13 +103,13 @@
         >
           <el-tab-pane label="任务名称" name="first2">
             <ul class="taskInfoUl">
-              <li>文件名称 xx</li>
-              <li>文件大小 1M</li>
-              <li>有效时长 20min</li>
-              <li>总时长 1小时</li>
-              <li>语种 中文</li>
-              <li>是否转写 否</li>
-              <li>是否降噪 否</li>
+              <li>文件名称 {{ fileInfo?.filename || '未知' }}</li>
+              <li>文件大小 {{ fileInfo?.size || '未知' }}</li>
+              <li>有效时长 {{ fileInfo?.effective_voice || '未知' }}</li>
+              <li>总时长 {{ fileInfo?.total_voice || '未知' }}</li>
+              <li>语种 {{ fileInfo?.language || '未知' }}</li>
+              <li>是否转写 {{ fileInfo?.status === '已转写' ? '是' : '否' }}</li>
+              <li>是否降噪 {{ fileInfo?.status === '已降噪' ? '是' : '否' }}</li>
             </ul>
           </el-tab-pane>
         </el-tabs>
@@ -137,21 +137,21 @@
             </div>
             <div class="fileReductionContent">
               <div class="videoBox">
-                <div v-if="isVideoLoading" class="video-loading">
+                <div v-if="isVideoLoading1" class="video-loading">
                   <el-icon class="loading-icon"><Loading /></el-icon>
                   <span>视频加载中...</span>
                 </div>
-                <div v-else-if="videoLoadError" class="video-error">
+                <div v-else-if="videoLoadError1" class="video-error">
                   <el-icon class="error-icon"><CircleClose /></el-icon>
                   <span>视频加载失败</span>
-                  <el-button type="primary" size="small" @click="retryLoadVideo">重试</el-button>
+                  <el-button type="primary" size="small" @click="retryLoadVideo1">重试</el-button>
                 </div>
                 <video
                   ref="videoRef1"
                   :src="videoUrl"
-                  @loadstart="handleVideoLoadStart"
-                  @loadeddata="handleVideoLoaded"
-                  @error="handleVideoError"
+                  @loadstart="handleVideoLoadStart1"
+                  @loadeddata="handleVideoLoaded1"
+                  @error="handleVideoError1"
                 >
                   您的浏览器不支持 video 标签。
                 </video>
@@ -208,13 +208,13 @@
         >
           <el-tab-pane label="任务名称" name="first3">
             <ul class="taskInfoUl">
-              <li>文件名称 xx</li>
-              <li>文件大小 1M</li>
-              <li>有效时长 20min</li>
-              <li>总时长 1小时</li>
-              <li>语种 中文</li>
-              <li>是否转写 否</li>
-              <li>是否降噪 否</li>
+              <li>文件名称 {{ fileInfo?.filename || '未知' }}</li>
+              <li>文件大小 {{ fileInfo?.size || '未知' }}</li>
+              <li>有效时长 {{ fileInfo?.effective_voice || '未知' }}</li>
+              <li>总时长 {{ fileInfo?.total_voice || '未知' }}</li>
+              <li>语种 {{ fileInfo?.language || '未知' }}</li>
+              <li>是否转写 {{ fileInfo?.status === '已转写' ? '是' : '否' }}</li>
+              <li>是否降噪 {{ fileInfo?.status === '已降噪' ? '是' : '否' }}</li>
             </ul>
           </el-tab-pane>
         </el-tabs>
@@ -288,22 +288,13 @@ onMounted(() => {
       console.log('文件ID：', id.value);
       console.log('任务ID：', taskId.value);
       
-      // 更新页面显示的文件信息
-      if (fileInfo.value) {
-        // 更新任务名称标签页中的信息
-        const taskInfoItems = document.querySelectorAll('.taskInfoUl li');
-        if (taskInfoItems.length > 0) {
-          taskInfoItems[0].textContent = `文件名称 ${fileInfo.value.filename || '未知'}`;
-          taskInfoItems[1].textContent = `文件大小 ${fileInfo.value.size || '未知'}`;
-          taskInfoItems[2].textContent = `有效时长 ${fileInfo.value.effective_voice || '未知'}`;
-          taskInfoItems[3].textContent = `总时长 ${fileInfo.value.total_voice || '未知'}`;
-          taskInfoItems[4].textContent = `语种 ${fileInfo.value.language || '未知'}`;
-          taskInfoItems[5].textContent = `是否转写 ${fileInfo.value.status === '已转写' ? '是' : '否'}`;
-          taskInfoItems[6].textContent = `是否降噪 ${fileInfo.value.status === '已降噪' ? '是' : '否'}`;
-        }
+      // 更新视频URL
+      if (fileInfo.value && fileInfo.value.url) {
         videoUrl.value = fileInfo.value.url;
         isVideoLoading.value = true;
+        isVideoLoading1.value = true;
         videoLoadError.value = false;
+        videoLoadError1.value = false;
       }
     } catch (error) {
       console.error('解析文件信息失败：', error);
@@ -320,6 +311,9 @@ const currentVolume1 = ref(1); // 音量范围是 0~1
 const isVideoLoading = ref(true);
 const videoLoadError = ref(false);
 
+const isVideoLoading1 = ref(true);
+const videoLoadError1 = ref(false);
+
 const handleVideoLoadStart = () => {
   isVideoLoading.value = true;
   videoLoadError.value = false;
@@ -335,11 +329,34 @@ const handleVideoError = () => {
   videoLoadError.value = true;
 };
 
+const handleVideoLoadStart1 = () => {
+  isVideoLoading1.value = true;
+  videoLoadError1.value = false;
+};
+
+const handleVideoLoaded1 = () => {
+  isVideoLoading1.value = false;
+  videoLoadError1.value = false;
+};
+
+const handleVideoError1 = () => {
+  isVideoLoading1.value = false;
+  videoLoadError1.value = true;
+};
+
 const retryLoadVideo = () => {
   if (videoRef.value) {
     isVideoLoading.value = true;
     videoLoadError.value = false;
     videoRef.value.load();
+  }
+};
+
+const retryLoadVideo1 = () => {
+  if (videoRef1.value) {
+    isVideoLoading1.value = true;
+    videoLoadError1.value = false;
+    videoRef1.value.load();
   }
 };
 
@@ -355,6 +372,18 @@ const pauseVideo = () => {
   }
 };
 
+const playVideo1 = () => {
+  if (videoRef1.value) {
+    videoRef1.value.play();
+  }
+};
+
+const pauseVideo1 = () => {
+  if (videoRef1.value) {
+    videoRef1.value.pause();
+  }
+};
+
 const increaseVolume = () => {
   if (videoRef.value) {
     currentVolume.value = Math.min(currentVolume.value + 0.1, 1);
@@ -366,18 +395,6 @@ const decreaseVolume = () => {
   if (videoRef.value) {
     currentVolume.value = Math.max(currentVolume.value - 0.1, 0);
     videoRef.value.volume = currentVolume.value;
-  }
-};
-
-const playVideo1 = () => {
-  if (videoRef1.value) {
-    videoRef1.value.play();
-  }
-};
-
-const pauseVideo1 = () => {
-  if (videoRef1.value) {
-    videoRef1.value.pause();
   }
 };
 
