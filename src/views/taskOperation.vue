@@ -108,7 +108,7 @@
         <div class="fileBox4">
           <TableSearch :query="query" :options="searchOpt" :search="handleSearch" />
           <el-table :data="tableData" border style="width: 100%">
-            <el-table-column type="selection" align="center" width="55" />
+            <!-- <el-table-column type="selection" align="center" width="55" /> -->
 
             <el-table-column label="文件名称" align="center" prop="filename" />
             <el-table-column label="大小" align="center" prop="size" />

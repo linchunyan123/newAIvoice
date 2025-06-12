@@ -31,26 +31,40 @@
               <div class="videoBox">
                 <div v-if="isVideoLoading" class="video-loading">
                   <el-icon class="loading-icon"><Loading /></el-icon>
-                  <span>视频加载中...</span>
+                  <span>媒体加载中...</span>
                 </div>
                 <div v-else-if="videoLoadError" class="video-error">
                   <el-icon class="error-icon"><CircleClose /></el-icon>
-                  <span>视频加载失败</span>
+                  <span>媒体加载失败</span>
                   <el-button type="primary" size="small" @click="retryLoadVideo">重试</el-button>
                 </div>
+                <!-- 视频播放器 -->
                 <video
+                  v-if="isVideoFile"
                   ref="videoRef"
                   :src="videoUrl"
                   @loadstart="handleVideoLoadStart"
                   @loadeddata="handleVideoLoaded"
                   @error="handleVideoError"
+                  controls
                 >
                   您的浏览器不支持 video 标签。
                 </video>
+                <!-- 音频播放器 -->
+                <audio
+                  v-else
+                  ref="audioRef"
+                  :src="videoUrl"
+                  @loadstart="handleVideoLoadStart"
+                  @loadeddata="handleVideoLoaded"
+                  @error="handleVideoError"
+                  controls
+                >
+                  您的浏览器不支持 audio 标签。
+                </audio>
               </div>
-              <div class="audioTrack">
-                音轨播放区
-                 <!-- <AudioWave :audioUrl="audioUrl" :bindVideo="videoRef" /> -->
+              <div class="audioTrack" ref="wavesurferContainer">
+                <!-- WaveSurfer 将在这里渲染波形 -->
               </div>
               <div class="audioAction">
                 <el-button type="success" plain @click="playVideo"
@@ -241,12 +255,17 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, reactive, nextTick, onMounted, watch } from "vue";
+import { ref, computed, reactive, nextTick, onMounted, watch, onBeforeUnmount } from "vue";
 import type { TabsPaneContext } from "element-plus";
 import { ArrowDown, Loading, CircleClose } from "@element-plus/icons-vue";
 import TableSearch from "@/components/operation-search.vue";
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
+import WaveSurfer from 'wavesurfer.js';
+import { ElMessage, ElMessageBox } from "element-plus";
+import type { UploadProps, UploadUserFile } from "element-plus";
+import { ElLoading } from "element-plus";
+
 const router = useRouter();
 const route = useRoute();
 const id = ref<string>('');
@@ -261,6 +280,180 @@ const getStatus = computed(() => {
   if (percentage.value === 100) return "success";
   return ""; // 默认值
 });
+
+// WaveSurfer 相关
+const wavesurfer = ref(null);
+const wavesurferContainer = ref(null);
+
+// 初始化 WaveSurfer
+const initWaveSurfer = () => {
+  if (wavesurfer.value) {
+    wavesurfer.value.destroy();
+  }
+
+  // 显示加载状态
+  const loading = ElLoading.service({
+    target: wavesurferContainer.value,
+    text: '音轨加载中...',
+    background: 'rgba(255, 255, 255, 0.9)',
+    customClass: 'wave-loading'
+  });
+
+  wavesurfer.value = WaveSurfer.create({
+    container: wavesurferContainer.value,
+    waveColor: '#409EFF',
+    progressColor: '#67C23A',
+    cursorColor: '#409EFF',
+    barWidth: 2,
+    barRadius: 3,
+    cursorWidth: 1,
+    height: 60,
+    barGap: 3,
+    normalize: true,
+    backend: 'WebAudio'
+  });
+
+  // 加载音频
+  if (fileInfo.value?.voice_url) {
+    wavesurfer.value.load(fileInfo.value.voice_url);
+  }
+
+  // 监听加载完成事件
+  wavesurfer.value.on('ready', () => {
+    loading.close();
+    // 设置初始音量
+    wavesurfer.value.setVolume(currentVolume.value);
+    // console.log('音轨加载完成，总时长：', wavesurfer.value.getDuration());
+  });
+
+  // 监听加载错误事件
+  wavesurfer.value.on('error', () => {
+    loading.close();
+    ElMessage.error('音轨加载失败');
+  });
+
+  // 同步视频/音频播放
+  if (isVideoFile.value && videoRef.value) {
+    // 视频播放时同步音轨
+    videoRef.value.addEventListener('play', () => {
+      // console.log('视频开始播放，当前时间：', videoRef.value.currentTime);
+      wavesurfer.value?.play();
+    });
+    
+    // 视频暂停时同步音轨
+    videoRef.value.addEventListener('pause', () => {
+      // console.log('视频暂停，当前时间：', videoRef.value.currentTime);
+      wavesurfer.value?.pause();
+    });
+    
+    // 视频进度变化时同步音轨
+    videoRef.value.addEventListener('timeupdate', () => {
+      if (videoRef.value && wavesurfer.value) {
+        const progress = videoRef.value.currentTime / videoRef.value.duration;
+        // console.log('视频进度更新，当前时间：', videoRef.value.currentTime, '总时长：', videoRef.value.duration, '进度：', progress);
+        wavesurfer.value.seekTo(progress);
+      }
+    });
+
+    // 音轨点击时同步视频
+    wavesurfer.value.on('seek', (progress) => {
+      if (videoRef.value) {
+        const seekTime = videoRef.value.duration * progress;
+        // console.log('音轨点击，目标时间：', seekTime, '总时长：', videoRef.value.duration, '进度：', progress);
+        videoRef.value.currentTime = seekTime;
+        // 如果视频当前是播放状态，则继续播放
+        if (!videoRef.value.paused) {
+          videoRef.value.play();
+        }
+      }
+    });
+
+    // 音轨点击事件
+    wavesurfer.value.on('click', (progress) => {
+      if (videoRef.value) {
+        const seekTime = videoRef.value.duration * progress;
+        // console.log('音轨点击，目标时间：', seekTime, '总时长：', videoRef.value.duration, '进度：', progress);
+        videoRef.value.currentTime = seekTime;
+        // 如果视频当前是播放状态，则继续播放
+        if (!videoRef.value.paused) {
+          videoRef.value.play();
+        }
+      }
+    });
+  } else if (!isVideoFile.value && audioRef.value) {
+    // 音频播放时同步音轨
+    audioRef.value.addEventListener('play', () => {
+      // console.log('音频开始播放，当前时间：', audioRef.value.currentTime);
+      wavesurfer.value?.play();
+    });
+    
+    // 音频暂停时同步音轨
+    audioRef.value.addEventListener('pause', () => {
+      // console.log('音频暂停，当前时间：', audioRef.value.currentTime);
+      wavesurfer.value?.pause();
+    });
+    
+    // 音频进度变化时同步音轨
+    audioRef.value.addEventListener('timeupdate', () => {
+      if (audioRef.value && wavesurfer.value) {
+        const progress = audioRef.value.currentTime / audioRef.value.duration;
+        // console.log('音频进度更新，当前时间：', audioRef.value.currentTime, '总时长：', audioRef.value.duration, '进度：', progress);
+        wavesurfer.value.seekTo(progress);
+      }
+    });
+
+    // 音轨点击时同步音频
+    wavesurfer.value.on('seek', (progress) => {
+      if (audioRef.value) {
+        const seekTime = audioRef.value.duration * progress;
+        // console.log('音轨点击，目标时间：', seekTime, '总时长：', audioRef.value.duration, '进度：', progress);
+        audioRef.value.currentTime = seekTime;
+        // 如果音频当前是播放状态，则继续播放
+        if (!audioRef.value.paused) {
+          audioRef.value.play();
+        }
+      }
+    });
+
+    // 音轨点击事件
+    wavesurfer.value.on('click', (progress) => {
+      if (audioRef.value) {
+        const seekTime = audioRef.value.duration * progress;
+        // console.log('音轨点击，目标时间：', seekTime, '总时长：', audioRef.value.duration, '进度：', progress);
+        audioRef.value.currentTime = seekTime;
+        // 如果音频当前是播放状态，则继续播放
+        if (!audioRef.value.paused) {
+          audioRef.value.play();
+        }
+      }
+    });
+  }
+
+  // 音轨播放时同步视频/音频
+  wavesurfer.value.on('play', () => {
+    if (isVideoFile.value && videoRef.value) {
+      // console.log('音轨开始播放，视频当前时间：', videoRef.value.currentTime);
+      videoRef.value.play();
+    } else if (!isVideoFile.value && audioRef.value) {
+      // console.log('音轨开始播放，音频当前时间：', audioRef.value.currentTime);
+      audioRef.value.play();
+    }
+  });
+
+  // 音轨暂停时同步视频/音频
+  wavesurfer.value.on('pause', () => {
+    if (isVideoFile.value && videoRef.value) {
+      // console.log('音轨暂停，视频当前时间：', videoRef.value.currentTime);
+      videoRef.value.pause();
+    } else if (!isVideoFile.value && audioRef.value) {
+      // console.log('音轨暂停，音频当前时间：', audioRef.value.currentTime);
+      audioRef.value.pause();
+    }
+  });
+};
+
+const isVideoFile = ref(false);
+const audioRef = ref(null);
 
 // 在组件挂载时获取并解析文件信息
 onMounted(() => {
@@ -284,17 +477,25 @@ onMounted(() => {
   if (query.fileInfo) {
     try {
       fileInfo.value = JSON.parse(query.fileInfo as string);
-      console.log('fileView页面接收到的文件信息：', fileInfo.value);
-      console.log('文件ID：', id.value);
-      console.log('任务ID：', taskId.value);
+      // console.log('fileView页面接收到的文件信息：', fileInfo.value);
+      // console.log('文件ID：', id.value);
+      // console.log('任务ID：', taskId.value);
       
-      // 更新视频URL
+      // 更新视频URL并判断文件类型
       if (fileInfo.value && fileInfo.value.url) {
         videoUrl.value = fileInfo.value.url;
+        // 根据文件扩展名判断是否为视频文件
+        const fileExtension = fileInfo.value.filename?.split('.').pop()?.toLowerCase();
+        isVideoFile.value = ['mp4', 'webm', 'ogg', 'mov'].includes(fileExtension || '');
         isVideoLoading.value = true;
         isVideoLoading1.value = true;
         videoLoadError.value = false;
         videoLoadError1.value = false;
+
+        // 初始化 WaveSurfer
+        nextTick(() => {
+          initWaveSurfer();
+        });
       }
     } catch (error) {
       console.error('解析文件信息失败：', error);
@@ -345,10 +546,14 @@ const handleVideoError1 = () => {
 };
 
 const retryLoadVideo = () => {
-  if (videoRef.value) {
+  if (isVideoFile.value && videoRef.value) {
     isVideoLoading.value = true;
     videoLoadError.value = false;
     videoRef.value.load();
+  } else if (!isVideoFile.value && audioRef.value) {
+    isVideoLoading.value = true;
+    videoLoadError.value = false;
+    audioRef.value.load();
   }
 };
 
@@ -361,14 +566,22 @@ const retryLoadVideo1 = () => {
 };
 
 const playVideo = () => {
-  if (videoRef.value) {
+  if (isVideoFile.value && videoRef.value) {
+    // console.log('点击播放按钮，视频当前时间：', videoRef.value.currentTime);
     videoRef.value.play();
+  } else if (!isVideoFile.value && audioRef.value) {
+    // console.log('点击播放按钮，音频当前时间：', audioRef.value.currentTime);
+    audioRef.value.play();
   }
 };
 
 const pauseVideo = () => {
-  if (videoRef.value) {
+  if (isVideoFile.value && videoRef.value) {
+    // console.log('点击暂停按钮，视频当前时间：', videoRef.value.currentTime);
     videoRef.value.pause();
+  } else if (!isVideoFile.value && audioRef.value) {
+    // console.log('点击暂停按钮，音频当前时间：', audioRef.value.currentTime);
+    audioRef.value.pause();
   }
 };
 
@@ -385,16 +598,26 @@ const pauseVideo1 = () => {
 };
 
 const increaseVolume = () => {
-  if (videoRef.value) {
+  if (isVideoFile.value && videoRef.value) {
     currentVolume.value = Math.min(currentVolume.value + 0.1, 1);
     videoRef.value.volume = currentVolume.value;
+    wavesurfer.value?.setVolume(currentVolume.value);
+  } else if (!isVideoFile.value && audioRef.value) {
+    currentVolume.value = Math.min(currentVolume.value + 0.1, 1);
+    audioRef.value.volume = currentVolume.value;
+    wavesurfer.value?.setVolume(currentVolume.value);
   }
 };
 
 const decreaseVolume = () => {
-  if (videoRef.value) {
+  if (isVideoFile.value && videoRef.value) {
     currentVolume.value = Math.max(currentVolume.value - 0.1, 0);
     videoRef.value.volume = currentVolume.value;
+    wavesurfer.value?.setVolume(currentVolume.value);
+  } else if (!isVideoFile.value && audioRef.value) {
+    currentVolume.value = Math.max(currentVolume.value - 0.1, 0);
+    audioRef.value.volume = currentVolume.value;
+    wavesurfer.value?.setVolume(currentVolume.value);
   }
 };
 
@@ -438,8 +661,6 @@ const handleClick3 = (tab: TabsPaneContext, event: Event) => {
 
 const buttons = [{ type: "primary", text: "⬅ 返回任务操作" }] as const;
 const dialogVisible = ref(false);
-import { ElMessage, ElMessageBox } from "element-plus";
-import type { UploadProps, UploadUserFile } from "element-plus";
 
 const fileList = ref<UploadUserFile[]>([
   {
@@ -484,6 +705,18 @@ const transcription = () => {
   // console.log("启动转写");
   activeName.value = "third";
 };
+
+// 在组件卸载前清理事件监听
+onBeforeUnmount(() => {
+  if (wavesurfer.value) {
+    wavesurfer.value.destroy();
+  }
+  if (videoRef.value) {
+    videoRef.value.removeEventListener('play', () => {});
+    videoRef.value.removeEventListener('pause', () => {});
+    videoRef.value.removeEventListener('timeupdate', () => {});
+  }
+});
 </script>
 
 <style scoped lang="scss">
@@ -637,12 +870,38 @@ const transcription = () => {
       }
       .audioTrack {
         width: 50%;
-        height: 50px;
+        height: 80px;
         border: 1px solid #dcdfe6;
         border-radius: 10px;
         padding: 10px;
         box-sizing: border-box;
         margin: 10px auto;
+        background: #fff;
+        position: relative;
+        overflow: hidden;
+
+        :deep(.wave-loading) {
+          .el-loading-spinner {
+            top: 50%;
+            margin-top: -15px;
+          }
+          
+          .el-loading-text {
+            font-size: 14px;
+            margin-top: 5px;
+          }
+        }
+
+        :deep(.wavesurfer-container) {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          
+          wave {
+            width: 100% !important;
+            height: 60px !important;
+          }
+        }
       }
       .audioAction {
         width: 50%;

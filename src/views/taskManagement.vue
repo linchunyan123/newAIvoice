@@ -167,7 +167,8 @@ const getData = async () => {
     search: query.name,
     status: query.status || undefined,
   });
-
+  // console.log(189, res);
+  
   if (res.data.code === 200) {
     page.total = res.data.data.total;
     returnData = res.data.data.list;
@@ -298,7 +299,7 @@ const handleDelete = async (row) => {
 const getTaskDEtailINfo = async ()=>{
   try {
     const res = await obtainDetails();
-    console.log(180, res);
+    // console.log(180, res);
 
     if (res.data.code === 200) {
       taskStatus.value = res.data.data;
