@@ -95,13 +95,54 @@ export const getTaskDetail = (task_id: string, page: number, limit: number, opti
     });
 }
 // 执行工作流
-export const workflow = (task_id,task_flow) => {
+export const workflow = (task_id, action, taskinfo_id?) => {
     return request({
-        url: '/queue/push',
+        url: '/queue/queueAction',
         method: 'post',
         data: {
             task_id: task_id,
-            task_flow: task_flow
+            action: action,
+            taskinfo_id: taskinfo_id || null
+        }
+    });
+};
+// 检测进度
+export const getFileProgress = (task_id,) => {
+    return request({
+        url: '/task/getFileProgress',
+        method: 'post',
+        data: {
+            task_id: task_id,
+        }
+    });
+};
+// 转写进度
+export const getFileTranscriptionProgress = (task_id,) => {
+    return request({
+        url: '/task/getFileTranscriptionProgress',
+        method: 'post',
+        data: {
+            task_id: task_id,
+        }
+    });
+};
+// 任务详情统计
+export const getTaskStatistics = (task_id,) => {
+    return request({
+        url: '/task/getTaskStatistics',
+        method: 'post',
+        data: {
+            task_id: task_id,
+        }
+    });
+};
+// 获取子文件任务详情
+export const getTaskFileDetail = (task_info_id,) => {
+    return request({
+        url: '/task/getTaskFileDetail',
+        method: 'post',
+        data: {
+            task_info_id: task_info_id,
         }
     });
 };

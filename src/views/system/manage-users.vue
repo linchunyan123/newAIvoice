@@ -8,10 +8,14 @@
                 <!-- <template #toolbarBtn>
                     <el-button type="warning" :icon="CirclePlusFilled" @click="visible = true">新增</el-button>
                 </template> -->
-                <!-- <template #status="{ rows }">
-                    <el-tag type="success" v-if="rows.status">启用</el-tag>
-                    <el-tag type="danger" v-else>禁用</el-tag>
-                </template> -->
+                <template #status="{ rows }">
+                    <el-switch
+                        v-model="rows.status"
+                        :active-value="1"
+                        :inactive-value="2"
+                        @change="(val) => handleStatusChange(rows, val)"
+                    />
+                </template>
                 <template #permissions="{ rows }">
                     <el-button type="primary" size="small" plain @click="handlePermission(rows)">管理</el-button>
                 </template>
@@ -23,10 +27,14 @@
         </el-dialog>
         <el-dialog title="查看详情" v-model="visible1" width="700px" destroy-on-close>
             <TableDetail :data="viewData">
-                <!-- <template #status="{ rows }">
-                    <el-tag type="success" v-if="rows.status">启用</el-tag>
-                    <el-tag type="danger" v-else>禁用</el-tag>
-                </template> -->
+                <template #status="{ rows }">
+                    <el-switch
+                        v-model="rows.status"
+                        :active-value="1"
+                        :inactive-value="2"
+                        @change="(val) => handleStatusChange(rows, val)"
+                    />
+                </template>
             </TableDetail>
         </el-dialog>
         <el-dialog title="权限管理" v-model="visible2" width="500px" destroy-on-close>
@@ -39,7 +47,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { fetchRoleData } from '@/api'; 
-import { getUserList, DeleteUser } from '@/api/admin';
+import { getUserList, DeleteUser, updateUserStatus } from '@/api/admin';
 import TableCustom from '@/components/table-custom.vue';
 import TableDetail from '@/components/table-detail.vue';
 import RolePermission from './role-permission.vue'
@@ -65,10 +73,14 @@ const handleSearch = () => {
 let columns = ref([
     { prop: 'id', label: '序号', width: 55, align: 'center' },
     { prop: 'username', label: '用户名称' },
-    { prop: 'password', label: '密码' },
+    // { prop: 'password', label: '密码' },
     { prop: 'nickname', label: '昵称' },
     { prop: 'role', label: '角色' },
-    { prop: 'status', label: '状态' },
+    { 
+        prop: 'status', 
+        label: '状态',
+        slot: 'status'
+    },
     { prop: 'update_time', label: '更新时间' },
     { prop: 'create_time', label: '创建时间' },
     { prop: "operator", label: "操作" },
@@ -147,6 +159,9 @@ const page = reactive({
 })
 const tableData = ref<User[]>([]);
 
+// 添加初始化标记
+const isInitialized = ref(false);
+
 // 修改获取数据的方法
 const getData = async () => {
     try {
@@ -158,8 +173,15 @@ const getData = async () => {
         console.log(188, res);
         
         if (res.data.code === 200) {
-            tableData.value = res.data.data.list;
+            // 处理角色显示
+            const processedData = res.data.data.list.map(item => ({
+                ...item,
+                role: item.role === 1 ? '管理员' : '普通用户'
+            }));
+            tableData.value = processedData;
             page.total = res.data.data.total;
+            // 数据加载完成后，设置初始化标记为true
+            isInitialized.value = true;
         } else {
             ElMessage.error(res.data.data.msg || '获取用户列表失败');
         }
@@ -222,7 +244,7 @@ const viewData = ref({
     column: 1
 });
 const handleView = (row: User) => {
-    viewData.value.row = { ...row }
+    viewData.value.row = row;
     viewData.value.list = [
         {
             prop: 'id',
@@ -243,6 +265,7 @@ const handleView = (row: User) => {
         {
             prop: 'status',
             label: '状态',
+            slot: 'status'
         },
         {
             prop: 'update_time',
@@ -275,6 +298,30 @@ const handleDelete = async (row) => {
   }
 }
 
+// 修改状态切换处理函数
+const handleStatusChange = async (row, status) => {
+    // 如果还未初始化完成，不执行状态更新
+    if (!isInitialized.value) return;
+    
+    try {
+        const res = await updateUserStatus({
+            uid: row.id,
+            status: status
+        });
+        // console.log(158, res);
+        
+        if (res.data.code === 200) {
+            // 更新成功后刷新数据
+            getData();
+            ElMessage.success('状态更新成功');
+        } else {
+            ElMessage.error(res.data.message || '状态更新失败');
+        }
+    } catch (error) {
+        console.error('更新状态失败:', error);
+        ElMessage.error('更新状态失败');
+    }
+};
 
 // 权限管理弹窗相关
 const visible2 = ref(false);

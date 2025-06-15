@@ -53,7 +53,7 @@
                             <a href="https://lin-xin.gitee.io/example/vuems-doc/" target="_blank">
                                 <el-dropdown-item>官方文档</el-dropdown-item>
                             </a> -->
-                            <el-dropdown-item command="user">创建用户</el-dropdown-item>
+                            <el-dropdown-item command="user" v-if="isAdmin">创建用户</el-dropdown-item>
                             <el-dropdown-item divided command="loginout" @click="loginout">退出登录</el-dropdown-item>
                         </el-dropdown-menu>
                     </template>
@@ -63,7 +63,7 @@
     </div>
 </template>
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useSidebarStore } from '../store/sidebar';
 import { useRouter } from 'vue-router';
 import imgurl from '../assets/img/img.jpg';
@@ -71,7 +71,13 @@ import {loginoutFn} from '../api/user';
 import { ElMessage } from "element-plus";
 
 const username: string | null = localStorage.getItem('vuems_name');
-const message: number = 2;
+const isAdmin = ref(false);
+
+// 检查用户角色
+const checkUserRole = () => {
+    const role = localStorage.getItem('role');
+    isAdmin.value = role === '1'; // 1为管理员，2为普通用户
+};
 
 const sidebar = useSidebarStore();
 // 侧边栏折叠
@@ -83,6 +89,7 @@ onMounted(() => {
     if (document.body.clientWidth < 1500) {
         collapseChage();
     }
+    checkUserRole(); // 页面加载时检查用户角色
 });
 
 // 用户名下拉菜单选择事件

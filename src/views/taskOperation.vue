@@ -5,46 +5,52 @@
         <el-tabs v-model="activeName1" class="demo-tabs1" @tab-click="handleClick1">
           <el-tab-pane label="任务名称" name="first1">
             <ul class="taskInfoUl">
-              <li>总文件 0个</li>
-              <li>有效文件 0个</li>
-              <li>已转写文件 0个</li>
-              <li>已降噪文件 0个</li>
+              <li>总文件 {{fileINfo.total}}个</li>
+              <li>有效文件 {{fileINfo.valid}}个</li>
+              <li>已转写文件 {{fileINfo.transcribed}}个</li>
+              <li>已降噪文件 {{fileINfo.cleared}}个</li>
             </ul>
           </el-tab-pane>
-          <el-tab-pane label="任务状态" name="second1">
+          <!-- <el-tab-pane label="任务状态" name="second1">
             <ul class="taskInfoUl">
               <li>正在处理 0个</li>
               <li>已完成 0个</li>
               <li>空白任务 0个</li>
             </ul>
-          </el-tab-pane>
+          </el-tab-pane> -->
         </el-tabs>
         <div class="fileBox">
           <div class="fileList">
-            <ul>
-              <li v-for="(file, index) in uploadFileList" :key="file.name" @mouseenter="file.isHover = true"
-                @mouseleave="file.isHover = false">
-                <el-icon class="icon1" color="#909399">
-                  <Document />
-                </el-icon>
-                <div>{{ file.name }}</div>
-                <el-icon class="icon2" v-if="!file.isHover" color="#67c23a">
-                  <SuccessFilled />
-                </el-icon>
-                <el-icon class="icon3" v-if="file.isHover" color="#f56c6c" @click="deleteFile(index)">
-                  <CircleClose />
-                </el-icon>
-              </li>
-            </ul>
+            <div class="fileListContent">
+              <ul>
+                <li v-for="(file, index) in uploadFileList" :key="file.name" @mouseenter="file.isHover = true"
+                  @mouseleave="file.isHover = false">
+                  <el-icon class="icon1" color="#909399">
+                    <Document />
+                  </el-icon>
+                  <div>{{ file.name }}</div>
+                  <el-icon class="icon2" v-if="!file.isHover" color="#67c23a">
+                    <SuccessFilled />
+                  </el-icon>
+                  <el-icon class="icon3" v-if="file.isHover" color="#f56c6c" @click="deleteFile(index)">
+                    <CircleClose />
+                  </el-icon>
+                </li>
+              </ul>
+            </div>
+            <div class="fileListInput">
+              <div class="uploadBtn">
+                <input type="file" multiple @change="handleFileChange" accept="audio/*,video/*" />
+                <el-button type="primary" size="large"><el-icon>
+                    <CirclePlus />
+                  </el-icon>添加文件</el-button>
+              </div>
+            </div>
           </div>
           <div class="fileAction">
-            <!-- <el-button class="btn" size="large" type="primary" @click="addFile"><el-icon><CirclePlus /></el-icon>添加文件</el-button> -->
-            <div class="uploadBtn">
-              <input type="file" multiple @change="handleFileChange" />
-              <el-button type="primary" size="large"><el-icon>
-                  <CirclePlus />
-                </el-icon>添加文件</el-button>
-            </div>
+            <el-button class="btn" size="large" type="primary" @click="uploadFiles"><el-icon>
+                <DocumentAdd />
+              </el-icon>上传文件</el-button>
             <el-button class="btn" size="large" type="primary" @click="detection"><el-icon>
                 <Loading />
               </el-icon>启动检测</el-button>
@@ -54,7 +60,7 @@
           </div>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="文件检测" name="second">
+      <el-tab-pane label="文件检测" name="second" :disabled="!canAccessDetection">
         <el-tabs v-model="activeName2" class="demo-tabs2" @tab-click="handleClick2">
           <el-tab-pane label="任务名称" name="first2">
             <ul class="taskInfoUl">
@@ -64,17 +70,17 @@
         </el-tabs>
         <div class="fileBox2">
           <div class="item">文件选择成功,系统开始处理</div>
-          <div class="item">文件总数量 20个</div>
-          <div class="item">文件总大小 100M</div>
-          <div class="item">文件总时长 50小时</div>
-          <div class="item">预计检测时间 30分钟</div>
+          <div class="item">文件总数量 {{detectionFile.total}}个</div>
+          <div class="item">文件总大小 {{detectionFile.size_info}}</div>
+          <div class="item">文件总时长 {{detectionFile.total_voice}}</div>
+          <div class="item">预计检测时间 {{detectionFile.estimate_time_info}}</div>
           <div class="item">处理进度：</div>
           <div class="demo-progress">
-            <el-progress :percentage="percentage" :status="getStatus" />
+            <el-progress :percentage="detectionFile.progress" :status="getStatus" />
           </div>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="文件转写" name="third">
+      <el-tab-pane label="文件转写" name="third" :disabled="!canAccessTranscription">
         <el-tabs v-model="activeName3" class="demo-tabs3" @tab-click="handleClick3">
           <el-tab-pane label="任务名称" name="first3">
             <ul class="taskInfoUl">
@@ -84,13 +90,13 @@
         </el-tabs>
         <div class="fileBox3">
           <div class="item">文件选择成功,系统开始处理</div>
-          <div class="item">文件总数量 100个</div>
-          <div class="item">文件总大小 300M</div>
-          <div class="item">文件总时长 50小时</div>
-          <div class="item">预计检测时间 5小时</div>
+          <div class="item">文件总数量 {{transitionFile.total}}个</div>
+          <div class="item">文件总大小 {{transitionFile.size_info}}</div>
+          <div class="item">文件总时长 {{transitionFile.total_voice}}</div>
+          <div class="item">预计检测时间 {{transitionFile.estimate_time_info}}</div>
           <div class="item">处理进度：</div>
           <div class="demo-progress">
-            <el-progress :percentage="percentage3" :status="getStatus3" />
+            <el-progress :percentage="transitionFile.progress" :status="getStatus3" />
           </div>
         </div>
       </el-tab-pane>
@@ -98,10 +104,10 @@
         <el-tabs v-model="activeName4" class="demo-tabs4" @tab-click="handleClick4">
           <el-tab-pane label="任务名称" name="first4">
             <ul class="taskInfoUl">
-              <li>总文件数 6个</li>
-              <li>有效文件数 3个</li>
-              <li>已转写文件 1个</li>
-              <li>已降噪文件 2个</li>
+              <li>总文件数 {{fileINfo.total}}个</li>
+              <li>有效文件数 {{fileINfo.valid}}个</li>
+              <li>已转写文件 {{fileINfo.transcribed}}个</li>
+              <li>已降噪文件 {{fileINfo.cleared}}个</li>
             </ul>
           </el-tab-pane>
         </el-tabs>
@@ -175,19 +181,41 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, reactive, nextTick, onMounted, watch, onActivated } from "vue";
+import { ref, computed, reactive, nextTick, onMounted, watch, onActivated, onUnmounted } from "vue";
 import type { TabsPaneContext } from "element-plus";
 import { ArrowDown } from "@element-plus/icons-vue";
 import TableSearch from "@/components/operation-search.vue";
 import { useRouter, useRoute } from "vue-router";
-import { getTaskDetail, uploadTask,workflow } from "@/api/task";
+import { getTaskDetail, uploadTask, workflow,getFileProgress,getFileTranscriptionProgress,getTaskStatistics } from "@/api/task";
 const id = ref("");
 const isHover = ref(false);
 const selectedFile = ref(null);
 const uploadFileList = reactive([]);
 const selectedFiles = reactive(new Map()); // 用于存储选择的文件
 import { useUploadStore } from "@/store/uploadStore";
-
+// 任务详情信息
+const fileINfo = ref({
+  cleared:0,
+  total:0,
+  transcribed:0,
+  valid:0
+})
+// 文件检测文件信息
+const detectionFile = ref({
+  total:0,
+  size_info:0,
+  total_voice:0,
+  estimate_time_info:0,
+  progress:0
+})
+// 文件转写文件信息
+const transitionFile = ref({
+  total:0,
+  size_info:0,
+  total_voice:0,
+  estimate_time_info:0,
+  progress:0
+})
 const uploadStore = useUploadStore();
 
 // 检查文件是否已存在
@@ -201,17 +229,26 @@ const handleFileChange = async (event) => {
     // 将文件添加到列表中
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      
+
+      // 检查文件类型
+      const fileType = file.type.toLowerCase();
+      const isAudioOrVideo = fileType.startsWith('audio/') || fileType.startsWith('video/');
+
+      if (!isAudioOrVideo) {
+        ElMessage.warning(`文件 "${file.name}" 不是音频或视频文件，已跳过`);
+        continue;
+      }
+
       // 检查文件是否已存在
       if (isFileExists(file.name)) {
         ElMessage.warning(`文件 "${file.name}" 已存在`);
         continue;
       }
-      
+
       const fileId = Date.now() + i; // 生成唯一ID
-      uploadFileList.push({ 
+      uploadFileList.push({
         id: fileId,
-        name: file.name, 
+        name: file.name,
         isHover: false,
         file: file // 保存文件对象
       });
@@ -231,6 +268,7 @@ const deleteFile = (index) => {
 };
 
 const uploadFiles = async () => {
+  console.log(1234567);
   if (selectedFiles.size === 0) {
     ElMessage.warning("请先选择文件");
     return;
@@ -244,11 +282,11 @@ const uploadFiles = async () => {
       fileObjects[`file${index}`] = file;
       index++;
     }
-    
+    ElMessage.success("正在上传文件...");
     // 调用上传API
     const res = await uploadTask(Number(id.value), fileObjects);
-    console.log(187,res);
-    
+    console.log(187, res);
+
     if (res.data.code === 200) {
       // ElMessage.success("文件上传成功");
       // 清空已上传的文件列表
@@ -265,22 +303,24 @@ const uploadFiles = async () => {
   }
 };
 
+// 添加访问控制变量
+const canAccessDetection = ref(false);
+const canAccessTranscription = ref(false);
+
+// 修改检测函数
 const detection = async () => {
-  if (selectedFiles.size === 0) {
-    ElMessage.warning("请先选择文件");
-    return;
-  }
-  ElMessage.success("正在跳转检测页面...");
   try {
-    await uploadFiles();
-    ElMessage.success("文件上传成功，正在启动检测...");
     activeName.value = "second";
+    canAccessDetection.value = true; // 允许访问检测页面
+    const res1 = await getFileProgress(id.value);
+    console.log(1799, res1);
+    detectionFile.value = res1.data.data;
     
     // 等待2秒让服务器处理文件
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    const res = await workflow(id.value, 1);
-    console.log(179,res);
+    const res = await workflow(id.value, 3);
+    console.log(179, res);
     
     if (res.data.code === 200) {
       // ElMessage.success("检测任务已启动");
@@ -293,25 +333,43 @@ const detection = async () => {
   }
 };
 
+// 添加定时器来更新进度
+let progressTimer: any = null;
+
+// 修改转写函数
 const transcription = async () => {
-  if (selectedFiles.size === 0) {
-    ElMessage.warning("请先选择文件");
-    return;
-  }
-  ElMessage.success("正在跳转转写页面...");
   try {
-    await uploadFiles();
-    ElMessage.success("文件上传成功，正在启动转写...");
     activeName.value = "third";
+    canAccessTranscription.value = true; // 允许访问转写页面
+    const res1 = await getFileTranscriptionProgress(id.value);
+    console.log(1799, res1);
+    transitionFile.value = res1.data.data;
+    
+    // 清除之前的定时器
+    if (progressTimer) {
+      clearInterval(progressTimer);
+    }
+    
+    // 设置定时器定期更新进度
+    progressTimer = setInterval(async () => {
+      const res = await getFileTranscriptionProgress(id.value);
+      if (res.data.code === 200) {
+        transitionFile.value = res.data.data;
+        // 如果进度达到100%，清除定时器
+        if (res.data.data.progress === 100) {
+          clearInterval(progressTimer);
+        }
+      }
+    }, 3000);
     
     // 等待2秒让服务器处理文件
     await new Promise(resolve => setTimeout(resolve, 2000));
     
-    const res = await workflow(id.value, 2);
-    console.log(179,res);
+    const res = await workflow(id.value, 4);
+    console.log(179, res);
     
     if (res.data.code === 200) {
-      ElMessage.success("转写任务已启动");
+      // ElMessage.success("转写任务已启动");
     } else {
       ElMessage.error(res.data.msg || "启动转写失败");
     }
@@ -320,6 +378,13 @@ const transcription = async () => {
     ElMessage.error("启动转写失败，请稍后重试");
   }
 };
+
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+  }
+});
 
 const router = useRouter();
 const route = useRoute();
@@ -388,11 +453,11 @@ const percentage = ref(90);
 const percentage3 = ref(100);
 // 状态只能是 '', 'success', 'exception', 'warning'
 const getStatus = computed(() => {
-  if (percentage.value === 100) return "success";
+  if (detectionFile.value.progress === 100) return "success";
   return ""; // 默认值
 });
 const getStatus3 = computed(() => {
-  if (percentage3.value === 100) return "success";
+  if (transitionFile.value.progress === 100) return "success";
   return ""; // 默认值
 });
 const activeName = ref("first");
@@ -402,9 +467,19 @@ const activeName2 = ref("first2");
 const activeName3 = ref("first3");
 const activeName4 = ref("first4");
 
+// 修改tab点击处理函数
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   nextTick(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
+    
+    // 如果是检测或转写页面，且没有权限访问，则阻止切换
+    if ((tab.props.name === "second" && !canAccessDetection.value) ||
+        (tab.props.name === "third" && !canAccessTranscription.value)) {
+      ElMessage.warning("请先启动相应的任务");
+      activeName.value = "first"; // 返回任务操作页面
+      return;
+    }
+    
     if (tab.props.name === "fourth") {
       getTaskDetail1();
     }
@@ -445,20 +520,20 @@ const toFile = (index, fileId) => {
   console.log('taskOperation页面传递的文件信息：', fileInfo);
   console.log('当前表格数据：', tableData.value);
   console.log('要查找的文件id：', fileId);
-  
+
   if (!fileInfo) {
     ElMessage.warning('未找到文件信息');
     return;
   }
-  
-  router.push({ 
-    path: "file-view", 
-    query: { 
+
+  router.push({
+    path: "file-view",
+    query: {
       index,
       id: fileId, // 文件id
       taskId: fileInfo.tid, // 任务id
-      fileInfo: JSON.stringify(fileInfo) // 将文件信息转换为字符串传递
-    } 
+      // fileInfo: JSON.stringify(fileInfo) // 将文件信息转换为字符串传递
+    }
   });
 };
 // 获取文件详情
@@ -474,41 +549,41 @@ const getTaskDetail1 = async () => {
       sort: "update_time",
       order: "desc"
     });
-    
+
     if (res.data.code === 200) {
       let filteredData = res.data.data.list;
       let totalData = res.data.data.list; // 保存原始数据用于计算总数
-      
+
       // 处理文件类型筛选
       if (query.fileType === "有效文件") {
-        filteredData = filteredData.filter(file => 
-          file.effective_voice && 
-          file.effective_voice !== "0" && 
+        filteredData = filteredData.filter(file =>
+          file.effective_voice &&
+          file.effective_voice !== "0" &&
           file.effective_voice !== ""
         );
-        totalData = totalData.filter(file => 
-          file.effective_voice && 
-          file.effective_voice !== "0" && 
+        totalData = totalData.filter(file =>
+          file.effective_voice &&
+          file.effective_voice !== "0" &&
           file.effective_voice !== ""
         );
       }
-      
+
       // 处理状态筛选
       if (query.status && query.status !== "全部") {
-        filteredData = filteredData.filter(file => 
+        filteredData = filteredData.filter(file =>
           file.status === query.status
         );
-        totalData = totalData.filter(file => 
+        totalData = totalData.filter(file =>
           file.status === query.status
         );
       }
-      
+
       // 确保每个文件对象都有id属性
       filteredData = filteredData.map(file => ({
         ...file,
         id: file.id || file.file_id || file.task_id // 尝试不同的可能id字段
       }));
-      
+
       console.log('设置到表格的数据：', filteredData);
       tableData.value = filteredData;
       // 使用筛选后的数据长度作为总数
@@ -556,11 +631,14 @@ onActivated(() => {
   }
 });
 
-onMounted(() => {
+onMounted(async() => {
   const index = route.query.index;
   id.value = route.query.id as string;
   console.log("查询参数 index:", index);
   console.log("查询参数 id:", id.value);
+  const res = await getTaskStatistics(id.value);
+  console.log(1499,res);
+  fileINfo.value = res.data.data;
   if (index == "1") {
     activeName.value = "first";
   } else if (index == "2") {
@@ -654,32 +732,65 @@ onMounted(() => {
   .fileList {
     width: 60%;
     height: 90%;
-    // background-color: aqua;
     border-radius: 10px;
     border: 1px solid #dcdfe6;
+    display: flex;
+    flex-direction: column;
 
-    ul {
-      list-style: none;
-      width: 96%;
-      margin: 0 auto;
-      margin-top: 10px;
+    .fileListContent {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
 
-      li {
-        margin: 10px 0;
-        display: flex;
-        align-items: center;
+      ul {
+        list-style: none;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+
+        li {
+          margin: 10px 0;
+          display: flex;
+          align-items: center;
+          position: relative;
+          color: #909399;
+          cursor: pointer;
+          padding: 5px 10px;
+
+          .icon1 {
+            margin-right: 5px;
+          }
+
+          .icon2,
+          .icon3 {
+            position: absolute;
+            right: 10px;
+          }
+        }
+      }
+    }
+
+    .fileListInput {
+      padding: 10px;
+      border-top: 1px solid #dcdfe6;
+
+      .uploadBtn {
         position: relative;
-        color: #909399;
         cursor: pointer;
+        width: 100%;
 
-        .icon1 {
-          margin-right: 5px;
+        input {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
         }
 
-        .icon2,
-        .icon3 {
-          position: absolute;
-          right: 0;
+        .el-button {
+          width: 100%;
         }
       }
     }
@@ -691,22 +802,6 @@ onMounted(() => {
     .btn {
       display: block;
       margin: 20px auto;
-    }
-
-    .uploadBtn {
-      position: relative;
-      cursor: pointer;
-
-      input {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: red;
-        opacity: 0;
-        cursor: pointer;
-      }
     }
   }
 }

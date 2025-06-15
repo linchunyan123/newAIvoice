@@ -1,12 +1,12 @@
 import request from '../utils/request';
 // 更新用户状态
-export const updateUserStatus = ([uid, status]) => {
+export const updateUserStatus = (params?: { uid?: number, status?: number }) => {
     return request({
         url: '/admin/updateUserStatus',
         method: 'post',
         data: {
-            uid: uid || null,
-            status: status || null
+            uid: params?.uid || null,
+            status: params?.status || null
         }
     });
 };

@@ -167,7 +167,7 @@ const getData = async () => {
     search: query.name,
     status: query.status || undefined,
   });
-  // console.log(189, res);
+  console.log(189, res);
   
   if (res.data.code === 200) {
     page.total = res.data.data.total;

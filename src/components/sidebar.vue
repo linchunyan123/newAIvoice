@@ -8,9 +8,9 @@
             :text-color="sidebar.textColor"
             router
         >
-            <template v-for="item in menuData">
+            <template v-for="item in menuData" :key="item.index">
                 <template v-if="item.children">
-                    <el-sub-menu :index="item.index" :key="item.index" v-permiss="item.id">
+                    <el-sub-menu :index="item.index" v-permiss="item.id">
                         <template #title>
                             <el-icon>
                                 <component :is="item.icon"></component>
@@ -40,7 +40,7 @@
                     </el-sub-menu>
                 </template>
                 <template v-else>
-                    <el-menu-item :index="item.index" :key="item.index" v-permiss="item.id">
+                    <el-menu-item :index="item.index" v-permiss="item.id">
                         <el-icon>
                             <component :is="item.icon"></component>
                         </el-icon>
@@ -53,21 +53,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref,computed ,watch} from 'vue';
-import { useSidebarStore } from '../store/sidebar';;
+import { ref, computed, watch } from 'vue';
+import { useSidebarStore } from '../store/sidebar';
 import { useRoute, useRouter } from 'vue-router';
-import { menuData } from '@/components/menu';
+import { getMenuData } from '@/components/menu';
 
 const route = useRoute();
 const router = useRouter();
 
 const onRoutes = ref(route.path);
-// const onRoutes = computed(() => {
-//     return route.path;
-// });
+const menuData = computed(() => getMenuData());
+
 watch(() => route.path, (newPath) => {
     onRoutes.value = newPath;
-});;
+});
 
 const sidebar = useSidebarStore();
 </script>

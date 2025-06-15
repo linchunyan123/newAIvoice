@@ -1,6 +1,8 @@
 import { Menus } from '@/types/menu';
+import { ref, computed } from 'vue';
 
-export const menuData: Menus[] = [
+// 基础菜单项
+const baseMenuItems: Menus[] = [
   {
     id: '0',
     title: '系统首页',
@@ -10,48 +12,15 @@ export const menuData: Menus[] = [
   {
     id: '1',
     title: '后处理任务',
-    // index: '1',
     index: '/task-management',
     icon: 'AlarmClock',
-    // children: [
-    //     {
-    //         id: '11',
-    //         pid: '1',
-    //         index: '/system-user',
-    //         title: '用户管理',
-    //     },
-    //     {
-    //         id: '12',
-    //         pid: '1',
-    //         index: '/system-role',
-    //         title: '角色管理',
-    //     },
-    //     {
-    //         id: '13',
-    //         pid: '1',
-    //         index: '/system-menu',
-    //         title: '菜单管理',
-    //     },
-    // ],
   },
-  {
-    id: '2',
-    title: '实时处理任务',
-    index: '/test',
-    icon: 'PieChart',
-  },
-  {
-    id: '3',
-    title: '管理用户',
-    index: '/manage-users',
-    icon: 'UserFilled',
-  },
-  {
-    id: '4',
-    title: '管理任务',
-    index: '/manage-tasks',
-    icon: 'ChatLineSquare',
-  },
+  // {
+  //   id: '2',
+  //   title: '实时处理任务',
+  //   index: '/test',
+  //   icon: 'PieChart',
+  // },
   //   {
   //     id: '3',
   //     title: '文件处理',
@@ -257,3 +226,33 @@ export const menuData: Menus[] = [
   //     ],
   // },
 ];
+
+// 管理员专属菜单项
+const adminMenuItems: Menus[] = [
+  {
+    id: '3',
+    title: '管理用户',
+    index: '/manage-users',
+    icon: 'UserFilled',
+  },
+  {
+    id: '4',
+    title: '管理任务',
+    index: '/manage-tasks',
+    icon: 'ChatLineSquare',
+  },
+];
+
+// 使用计算属性动态生成菜单
+export const getMenuData = () => {
+  const userRole = localStorage.getItem('role');
+  const isAdmin = userRole === '1';
+  
+  return [
+    ...baseMenuItems,
+    ...(isAdmin ? adminMenuItems : []),
+  ];
+};
+
+// 导出初始菜单数据
+export const menuData = getMenuData();

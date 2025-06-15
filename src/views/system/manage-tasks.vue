@@ -119,7 +119,8 @@ const handleSearch = () => {
 // 表格相关
 let columns = ref([
     { prop: 'id', label: 'id'},
-    { prop: 'uid', label: '序号' },
+    // { prop: 'uid', label: '序号' },
+    { prop: 'username', label: '昵称' },
     { prop: 'number', label: '编号' },
     { prop: 'name', label: '名称' },
     { prop: 'status', label: '状态' },
@@ -163,8 +164,26 @@ const getData = async () => {
     });
     console.log(177,res);
     
-    tableData.value = res.data.data.list;
+    // 处理状态显示
+    const processedData = res.data.data.list.map(item => ({
+        ...item,
+        status: getStatusText(item.status)
+    }));
+    
+    tableData.value = processedData;
     page.total = res.data.data.total;
+};
+
+// 添加状态文字转换函数
+const getStatusText = (status: number) => {
+    const statusMap = {
+        1: '空任务',
+        2: '已检测',
+        3: '已转写',
+        4: '处理中',
+        5: '暂停中'
+    };
+    return statusMap[status] || '未知状态';
 };
 
 // 添加onMounted钩子

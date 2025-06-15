@@ -98,6 +98,14 @@ const submitForm = async (formEl: FormInstance | undefined) => {
       localStorage.setItem("role", res.data.data.userinfo.role);
       ElMessage.success("登录成功");
       localStorage.setItem("vuems_name", param.username);
+      if (checked.value) {
+        localStorage.setItem("login-param", JSON.stringify({
+          username: param.username,
+          password: param.password
+        }));
+      } else {
+        localStorage.removeItem("login-param");
+      }
       const keys =
         permiss.defaultList[param.username == "admin" ? "admin" : "user"];
       permiss.handleSet(keys);

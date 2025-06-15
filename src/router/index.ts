@@ -55,7 +55,6 @@ const routes: RouteRecordRaw[] = [
                 name: 'user-create',
                 meta: {
                     title: '创建用户',
-                    // permiss: '7',
                     permiss: '14',
                 },
                 component: () => import(/* 创建用户页面" */ '../views/userCreate.vue'),
@@ -66,6 +65,7 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     title: '管理用户',
                     permiss: '15',
+                    adminOnly: true,
                 },
                 component: () => import(/* 管理用户页面 */ '../views/system/manage-users.vue'),
             },
@@ -75,6 +75,7 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     title: '管理任务',
                     permiss: '16',
+                    adminOnly: true,
                 },
                 component: () => import(/* 管理任务 */ '../views/system/manage-tasks.vue'),
             },
@@ -310,11 +311,15 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     NProgress.start();
     const role = localStorage.getItem('vuems_name');
+    const userRole = localStorage.getItem('role');
     const permiss = usePermissStore();
 
     if (!role && to.meta.noAuth !== true) {
         // 未登录且访问需要权限的页面时，重定向到登录页
         next('/login');
+    } else if (to.meta.adminOnly && userRole !== '1') {
+        // 如果是管理员专属页面但用户不是管理员，则进入403
+        next('/403');
     } else if (typeof to.meta.permiss == 'string' && !permiss.key.includes(to.meta.permiss)) {
         // 如果没有权限，则进入403
         next('/403');
