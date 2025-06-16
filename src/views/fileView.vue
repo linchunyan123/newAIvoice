@@ -257,7 +257,7 @@ const getStatus = computed(() => {
 const workflow1 = async () => {
   try {
     console.log('taskId:', taskId.value, 'id:', id.value);
-    const res = await workflow(taskId.value, 4, id.value);
+    const res = await workflow(taskId.value, 2, id.value);
     console.log('降噪转写响应:', res);
     if (res.data.status === 'success') {
       ElMessage.success('降噪转写任务已启动');

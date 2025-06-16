@@ -113,8 +113,8 @@
         </el-tabs>
         <div class="fileBox4">
           <TableSearch :query="query" :options="searchOpt" :search="handleSearch" />
-          <el-table :data="tableData" border style="width: 100%">
-            <!-- <el-table-column type="selection" align="center" width="55" /> -->
+          <el-table :data="tableData" border style="width: 100%" @selection-change="handleSelectionChange">
+            <el-table-column type="selection" align="center" width="55" />
 
             <el-table-column label="文件名称" align="center" prop="filename" />
             <el-table-column label="大小" align="center" prop="size" />
@@ -126,7 +126,7 @@
             <el-table-column label="操作" align="center" width="500">
               <!-- 你可以在这里放操作按钮 -->
               <template #default="scope">
-                <el-button type="success" @click="dialogVisible = true"><el-icon>
+                <el-button type="success" @click="handlePreview(scope.row)"><el-icon>
                     <View />
                   </el-icon>转写预览</el-button>
                 <el-dropdown style="margin: 0 10px">
@@ -136,10 +136,10 @@
                   </el-button>
                   <template #dropdown>
                     <el-dropdown-menu>
-                      <el-dropdown-item>带时间戳的转写文件</el-dropdown-item>
-                      <el-dropdown-item>无时间戳转写文件</el-dropdown-item>
-                      <el-dropdown-item>word文档</el-dropdown-item>
-                      <el-dropdown-item>降噪文件</el-dropdown-item>
+                      <el-dropdown-item @click="downloadText('withTimestamp')">带时间戳的转写文件</el-dropdown-item>
+                      <el-dropdown-item @click="downloadText('withoutTimestamp')">无时间戳转写文件</el-dropdown-item>
+                      <el-dropdown-item @click="downloadText('word')">word文档</el-dropdown-item>
+                      <el-dropdown-item @click="downloadText('noise')">降噪文件</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
@@ -153,18 +153,28 @@
             </el-table-column>
           </el-table>
           <div class="operationBottom">
-            <el-button type="primary" class="btn" @click="transcription">选择文件转写</el-button>
+            <el-button type="primary" class="btn" @click="batchTranscription">选择文件转写</el-button>
             <el-pagination :current-page="page.index" :page-size="page.size" :page-sizes="[5, 10, 15, 20]"
               layout="total, sizes, prev, pager, next, jumper" :total="page.total" @size-change="changeSize"
               @current-change="changePage" />
           </div>
         </div>
         <el-dialog v-model="dialogVisible" title="转写预览" width="600" :style="{ height: '500px' }"
-          :before-close="handleClose">
-          <span>转写的文本预览...</span>
+          >
+          <div class="transcriptionPreviewContent">
+            <div v-if="previewText" class="lyrics-container">
+              <div v-for="(segment, index) in JSON.parse(previewText).segments" :key="index" class="lyric-line">
+                <span class="time-stamp">[{{ formatTime(segment.start) }} - {{ formatTime(segment.end) }}]</span>
+                <span v-if="segment.speaker" class="speaker">({{ segment.speaker }})</span>
+                <span class="lyric-text">{{ segment.text }}</span>
+              </div>
+            </div>
+            <div v-else class="no-content">
+              暂无转写内容
+            </div>
+          </div>
           <template #footer>
             <div class="dialog-footer">
-              <!-- <el-button @click="dialogVisible = false">Cancel</el-button> -->
               <el-button type="primary" @click="dialogVisible = false">
                 确认
               </el-button>
@@ -187,11 +197,12 @@ import { ArrowDown } from "@element-plus/icons-vue";
 import TableSearch from "@/components/operation-search.vue";
 import { useRouter, useRoute } from "vue-router";
 import { getTaskDetail, uploadTask, workflow,getFileProgress,getFileTranscriptionProgress,getTaskStatistics } from "@/api/task";
+import { Document, Paragraph, Packer, TextRun } from 'docx';
 const id = ref("");
 const isHover = ref(false);
 const selectedFile = ref(null);
 const uploadFileList = reactive([]);
-const selectedFiles = reactive(new Map()); // 用于存储选择的文件
+const selectedFiles = ref<any[]>([]);
 import { useUploadStore } from "@/store/uploadStore";
 // 任务详情信息
 const fileINfo = ref({
@@ -252,7 +263,12 @@ const handleFileChange = async (event) => {
         isHover: false,
         file: file // 保存文件对象
       });
-      selectedFiles.set(fileId, file);
+      selectedFiles.value.push({
+        id: fileId,
+        name: file.name,
+        isHover: false,
+        file: file // 保存文件对象
+      });
     }
   } else {
     ElMessage.warning("请选择要上传的文件");
@@ -263,13 +279,13 @@ const handleFileChange = async (event) => {
 
 const deleteFile = (index) => {
   const fileId = uploadFileList[index].id;
-  selectedFiles.delete(fileId); // 从Map中删除文件
+  selectedFiles.value = selectedFiles.value.filter(file => file.id !== fileId);
   uploadFileList.splice(index, 1);
 };
 
 const uploadFiles = async () => {
   console.log(1234567);
-  if (selectedFiles.size === 0) {
+  if (selectedFiles.value.length === 0) {
     ElMessage.warning("请先选择文件");
     return;
   }
@@ -278,8 +294,8 @@ const uploadFiles = async () => {
     // 构建文件对象
     const fileObjects = {};
     let index = 1;
-    for (const [_, file] of selectedFiles) {
-      fileObjects[`file${index}`] = file;
+    for (const file of selectedFiles.value) {
+      fileObjects[`file${index}`] = file.file;
       index++;
     }
     ElMessage.success("正在上传文件...");
@@ -288,10 +304,10 @@ const uploadFiles = async () => {
     console.log(187, res);
 
     if (res.data.code === 200) {
-      // ElMessage.success("文件上传成功");
+      ElMessage.success("文件上传成功");
       // 清空已上传的文件列表
       uploadFileList.length = 0;
-      selectedFiles.clear();
+      selectedFiles.value = [];
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {
@@ -310,6 +326,12 @@ const canAccessTranscription = ref(false);
 // 修改检测函数
 const detection = async () => {
   try {
+    // 检查是否有文件
+    if (fileINfo.value.total === 0) {
+      ElMessage.warning('请先上传文件');
+      return;
+    }
+
     activeName.value = "second";
     canAccessDetection.value = true; // 允许访问检测页面
     const res1 = await getFileProgress(id.value);
@@ -339,6 +361,12 @@ let progressTimer: any = null;
 // 修改转写函数
 const transcription = async () => {
   try {
+    // 检查是否有文件
+    if (fileINfo.value.total === 0) {
+      ElMessage.warning('请先上传文件');
+      return;
+    }
+
     activeName.value = "third";
     canAccessTranscription.value = true; // 允许访问转写页面
     const res1 = await getFileTranscriptionProgress(id.value);
@@ -390,6 +418,7 @@ const router = useRouter();
 const route = useRoute();
 
 const dialogVisible = ref(false);
+const previewText = ref('');
 
 const handleClose = (done: () => void) => {
   ElMessageBox.confirm("确定关闭窗口吗?")
@@ -561,19 +590,11 @@ const getTaskDetail1 = async () => {
           file.effective_voice !== "0" &&
           file.effective_voice !== ""
         );
-        totalData = totalData.filter(file =>
-          file.effective_voice &&
-          file.effective_voice !== "0" &&
-          file.effective_voice !== ""
-        );
       }
 
       // 处理状态筛选
       if (query.status && query.status !== "全部") {
         filteredData = filteredData.filter(file =>
-          file.status === query.status
-        );
-        totalData = totalData.filter(file =>
           file.status === query.status
         );
       }
@@ -586,8 +607,8 @@ const getTaskDetail1 = async () => {
 
       console.log('设置到表格的数据：', filteredData);
       tableData.value = filteredData;
-      // 使用筛选后的数据长度作为总数
-      page.total = totalData.length;
+      // 使用后端返回的总数
+      page.total = res.data.data.total;
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {
@@ -650,6 +671,162 @@ onMounted(async() => {
     getTaskDetail1();
   }
 });
+
+// 处理表格多选
+const handleSelectionChange = (selection: any[]) => {
+  selectedFiles.value = selection;
+  console.log('当前选中的文件：', selection);
+};
+
+// 批量转写函数
+const batchTranscription = async () => {
+  if (selectedFiles.value.length === 0) {
+    ElMessage.warning('请先选择要转写的文件');
+    return;
+  }
+
+  try {
+    // 获取选中文件的id数组
+    const fileIds = selectedFiles.value.map(file => file.id);
+    console.log('要转写的文件ID数组：', fileIds);
+    
+    // 调用转写接口
+    const res = await workflow(id.value, 4, fileIds);
+    console.log('转写接口返回数据：', res);
+    
+    if (res.data.code === 200) {
+      ElMessage.success('转写任务已启动');
+      // 刷新表格数据
+      getTaskDetail1();
+    } else {
+      ElMessage.error(res.data.msg || '启动转写失败');
+    }
+  } catch (error) {
+    console.error('启动转写失败:', error);
+    ElMessage.error('启动转写失败，请稍后重试');
+  }
+};
+
+// 格式化时间
+const formatTime = (time: number) => {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  const milliseconds = Math.floor((time % 1) * 1000);
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+};
+
+// 修改表格操作列的转写预览按钮点击事件
+const handlePreview = (row) => {
+  previewText.value = row.text_info;
+  dialogVisible.value = true;
+};
+
+// 下载文本
+const downloadText = (type) => {
+  if (!previewText.value) {
+    ElMessage.warning('暂无转写内容');
+    return;
+  }
+
+  try {
+    const segments = JSON.parse(previewText.value).segments;
+    let content = '';
+    const currentFile = tableData.value.find(item => item.text_info === previewText.value);
+    const filename = currentFile?.filename.split('.')[0] || '转写文本';
+
+    switch (type) {
+      case 'withTimestamp':
+        content = segments.map(segment => 
+          `[${formatTime(segment.start)} - ${formatTime(segment.end)}]${segment.speaker ? ` (${segment.speaker})` : ''} ${segment.text}`
+        ).join('\n');
+        downloadFile(content, `${filename}_带时间戳.txt`, 'text/plain');
+        break;
+
+      case 'withoutTimestamp':
+        content = segments.map(segment => 
+          `${segment.speaker ? `(${segment.speaker}) ` : ''}${segment.text}`
+        ).join('\n');
+        downloadFile(content, `${filename}_无时间戳.txt`, 'text/plain');
+        break;
+
+      case 'word':
+        // 构建HTML内容
+        let htmlContent = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+                xmlns:w="urn:schemas-microsoft-com:office:word" 
+                xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta charset="utf-8">
+            <title>${filename}</title>
+          </head>
+          <body>
+        `;
+
+        segments.forEach(segment => {
+          htmlContent += `
+            <p>
+              <span style="color: #666;">[${formatTime(segment.start)} - ${formatTime(segment.end)}]</span>
+              ${segment.speaker ? `<span style="color: #409EFF;">(${segment.speaker})</span> ` : ''}
+              <span style="color: #333;">${segment.text}</span>
+            </p>
+          `;
+        });
+
+        htmlContent += '</body></html>';
+
+        // 创建Blob对象
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        
+        // 创建下载链接
+        const downloadLink = document.createElement('a');
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = `${filename}_转写文本.doc`;
+        
+        // 触发下载
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        window.URL.revokeObjectURL(downloadLink.href);
+        break;
+
+      case 'noise':
+        if (!currentFile) {
+          ElMessage.warning('未找到文件信息');
+          return;
+        }
+        
+        if (!currentFile.clear_url) {
+          ElMessage.warning('请先进行降噪处理');
+          return;
+        }
+        
+        // 下载降噪文件
+        const noiseLink = document.createElement('a');
+        noiseLink.href = currentFile.clear_url;
+        noiseLink.download = `${filename}_降噪文件.${currentFile.clear_url.split('.').pop()}`;
+        document.body.appendChild(noiseLink);
+        noiseLink.click();
+        document.body.removeChild(noiseLink);
+        break;
+    }
+  } catch (error) {
+    console.error('下载失败:', error);
+    ElMessage.error('下载失败');
+  }
+};
+
+// 下载文件
+const downloadFile = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = window.URL.createObjectURL(blob);
+  const downloadLink = document.createElement('a');
+  downloadLink.href = url;
+  downloadLink.download = filename;
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+  window.URL.revokeObjectURL(url);
+};
 </script>
 
 <style scoped lang="scss">
@@ -851,5 +1028,48 @@ onMounted(async() => {
   position: absolute;
   bottom: 10px;
   right: 10px;
+}
+
+.transcriptionPreviewContent {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+
+  .lyrics-container {
+    .lyric-line {
+      margin-bottom: 8px;
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+
+      .time-stamp {
+        color: #666;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+
+      .speaker {
+        color: #409EFF;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+
+      .lyric-text {
+        color: #333;
+        font-size: 14px;
+        flex: 1;
+      }
+    }
+  }
+
+  .no-content {
+    text-align: center;
+    color: #909399;
+    font-size: 14px;
+    padding: 20px;
+  }
 }
 </style>
