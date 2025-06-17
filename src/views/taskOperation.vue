@@ -320,8 +320,19 @@ const uploadFiles = async () => {
       // 清空已上传的文件列表
       uploadFileList.length = 0;
       selectedFiles.value = [];
-      // 启用按钮
-      isButtonDisabled.value = false;
+      
+      // 重新获取任务统计信息
+      const statsRes = await getTaskStatistics(id.value);
+      if (statsRes.data.code === 200) {
+        fileINfo.value = statsRes.data.data;
+        console.log('更新后的任务统计信息：', fileINfo.value);
+      }
+      
+      // 3秒后启用按钮
+      setTimeout(() => {
+        isButtonDisabled.value = false;
+        ElMessage.success("可以开始检测或转写");
+      }, 3000);
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {
@@ -627,15 +638,41 @@ const toFile = (index, fileId) => {
     return;
   }
 
-  router.push({
-    path: "file-view",
-    query: {
-      index,
-      id: fileId, // 文件id
-      taskId: fileInfo.tid, // 任务id
-      // fileInfo: JSON.stringify(fileInfo) // 将文件信息转换为字符串传递
+  // 如果是降噪操作（index === 2）
+  if (index === 2) {
+    // 判断clear_url是否为空
+    if (!fileInfo.clear_url) {
+      // 如果为空，跳转到降噪转写页面
+      router.push({
+        path: "file-view",
+        query: {
+          index: "3", // 降噪转写页面
+          id: fileId,
+          taskId: fileInfo.tid
+        }
+      });
+    } else {
+      // 如果不为空，跳转到文件降噪页面
+      router.push({
+        path: "file-view",
+        query: {
+          index: "2", // 文件降噪页面
+          id: fileId,
+          taskId: fileInfo.tid
+        }
+      });
     }
-  });
+  } else {
+    // 其他操作保持原有逻辑
+    router.push({
+      path: "file-view",
+      query: {
+        index,
+        id: fileId,
+        taskId: fileInfo.tid
+      }
+    });
+  }
 };
 // 获取文件详情
 const page = reactive({

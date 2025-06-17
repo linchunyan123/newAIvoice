@@ -137,12 +137,12 @@
                   <span>媒体加载失败</span>
                   <el-button type="primary" size="small" @click="retryLoadVideo1">重试</el-button>
                 </div>
-                <video v-if="isVideoFile" ref="videoRef1" :src="getFileInfo.url" @loadstart="handleVideoLoadStart1"
+                <video v-if="isVideoFile" ref="videoRef1" :src="getFileInfo.clear_url" @loadstart="handleVideoLoadStart1"
                   @loadeddata="handleVideoLoaded1" @error="handleVideoError1" controls>
                   您的浏览器不支持 video 标签。
                 </video>
                 <!-- 音频播放器 -->
-                <audio v-else ref="audioRef1" :src="getFileInfo.url" @loadstart="handleVideoLoadStart1"
+                <audio v-else ref="audioRef1" :src="getFileInfo.clear_url" @loadstart="handleVideoLoadStart1"
                   @loadeddata="handleVideoLoaded1" @error="handleVideoError1" controls>
                   您的浏览器不支持 audio 标签。
                 </audio>
@@ -211,7 +211,7 @@
           </el-tab-pane>
         </el-tabs>
         <!-- <div class="fileBox3"> -->
-          <el-button type="primary" class="clearbtn" @click="workflow1()">启动降噪转写</el-button>
+          <el-button type="primary" class="clearbtn" @click="workflow1()">启动降噪</el-button>
           <!-- <div class="item">处理进度：</div>
           <div class="demo-progress">
             <el-progress :percentage="percentage" :status="getStatus" />
@@ -882,6 +882,19 @@ const decreaseVolume1 = () => {
 const handleClick = (tab: TabsPaneContext, event: Event) => {
   nextTick(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
+    
+    // 如果是文件降噪页面
+    if (tab.props.name === "second") {
+      // 判断clear_url是否为空
+      if (!getFileInfo.value.clear_url) {
+        ElMessage.warning('该文件尚未降噪，即将跳转到降噪转写页面');
+        // 3秒后跳转到降噪转写页面
+        setTimeout(() => {
+          activeName.value = "third";
+        }, 3000);
+        return;
+      }
+    }
   });
 };
 
@@ -951,16 +964,48 @@ const transcription = () => {
 
 // 在组件卸载前清理事件监听
 onBeforeUnmount(() => {
+  // 清理第一个页面的 WaveSurfer
   if (wavesurfer.value) {
     wavesurfer.value.destroy();
+    wavesurfer.value = null;
   }
+
+  // 清理第二个页面的 WaveSurfer
   if (wavesurfer1.value) {
     wavesurfer1.value.destroy();
+    wavesurfer1.value = null;
   }
+
+  // 清理视频事件监听
   if (videoRef.value) {
-    videoRef.value.removeEventListener('play', () => { });
-    videoRef.value.removeEventListener('pause', () => { });
-    videoRef.value.removeEventListener('timeupdate', () => { });
+    videoRef.value.removeEventListener('play', () => {});
+    videoRef.value.removeEventListener('pause', () => {});
+    videoRef.value.removeEventListener('timeupdate', () => {});
+    videoRef.value.removeEventListener('seeked', () => {});
+  }
+
+  // 清理音频事件监听
+  if (audioRef.value) {
+    audioRef.value.removeEventListener('play', () => {});
+    audioRef.value.removeEventListener('pause', () => {});
+    audioRef.value.removeEventListener('timeupdate', () => {});
+    audioRef.value.removeEventListener('seeked', () => {});
+  }
+
+  // 清理第二个页面的视频事件监听
+  if (videoRef1.value) {
+    videoRef1.value.removeEventListener('play', () => {});
+    videoRef1.value.removeEventListener('pause', () => {});
+    videoRef1.value.removeEventListener('timeupdate', () => {});
+    videoRef1.value.removeEventListener('seeked', () => {});
+  }
+
+  // 清理第二个页面的音频事件监听
+  if (audioRef1.value) {
+    audioRef1.value.removeEventListener('play', () => {});
+    audioRef1.value.removeEventListener('pause', () => {});
+    audioRef1.value.removeEventListener('timeupdate', () => {});
+    audioRef1.value.removeEventListener('seeked', () => {});
   }
 });
 
