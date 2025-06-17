@@ -28,4 +28,9 @@ export default defineConfig({
 	define: {
 		__VUE_PROD_HYDRATION_MISMATCH_DETAILS__: "true",
 	},
+	server: {
+		host: '0.0.0.0', // 开放所有外部 IP 访问
+		port: 5173,      // 你可以改成任意未被占用的端口
+		open: true       // 启动自动打开浏览器（可选）
+	}
 });
