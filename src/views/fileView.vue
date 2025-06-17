@@ -259,7 +259,7 @@ const workflow1 = async () => {
     console.log('taskId:', taskId.value, 'id:', id.value);
     const res = await workflow(taskId.value, 2, id.value);
     console.log('降噪转写响应:', res);
-    if (res.data.status === 'success') {
+    if (res.data.code === 200) {
       ElMessage.success('降噪转写任务已启动');
     } else {
       ElMessage.error(res.data.msg || '启动失败');
@@ -372,18 +372,18 @@ const initWaveSurfer = () => {
 
     // 音轨点击时同步视频
     wavesurfer.value.on('seek', (progress) => {
-      if (videoRef.value) {
+  if (videoRef.value) {
         const seekTime = videoRef.value.duration * progress;
         videoRef.value.currentTime = seekTime;
         if (!videoRef.value.paused) {
-          videoRef.value.play();
-        }
+    videoRef.value.play();
+  }
       }
     });
 
     // 音轨点击事件
     wavesurfer.value.on('click', (progress) => {
-      if (videoRef.value) {
+  if (videoRef.value) {
         const seekTime = videoRef.value.duration * progress;
         videoRef.value.currentTime = seekTime;
         if (!videoRef.value.paused) {
@@ -453,7 +453,7 @@ const initWaveSurfer = () => {
   // 音轨暂停时同步视频/音频
   wavesurfer.value.on('pause', () => {
     if (isVideoFile.value && videoRef.value) {
-      videoRef.value.pause();
+    videoRef.value.pause();
     } else if (!isVideoFile.value && audioRef.value) {
       audioRef.value.pause();
     }
@@ -555,18 +555,18 @@ const initWaveSurfer1 = () => {
 
     // 音轨点击时同步视频
     wavesurfer1.value.on('seek', (progress) => {
-      if (videoRef1.value) {
+  if (videoRef1.value) {
         const seekTime = videoRef1.value.duration * progress;
         videoRef1.value.currentTime = seekTime;
         if (!videoRef1.value.paused) {
-          videoRef1.value.play();
-        }
+    videoRef1.value.play();
+  }
       }
     });
 
     // 音轨点击事件
     wavesurfer1.value.on('click', (progress) => {
-      if (videoRef1.value) {
+  if (videoRef1.value) {
         const seekTime = videoRef1.value.duration * progress;
         videoRef1.value.currentTime = seekTime;
         if (!videoRef1.value.paused) {

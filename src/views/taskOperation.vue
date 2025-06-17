@@ -40,21 +40,21 @@
             </div>
             <div class="fileListInput">
               <div class="uploadBtn">
-                <input type="file" multiple @change="handleFileChange" accept="audio/*,video/*" />
-                <el-button type="primary" size="large"><el-icon>
+                <input type="file" multiple @change="handleFileChange" accept="audio/*,video/*" style="display: none;" ref="fileInput" />
+                <el-button type="primary" size="large" @click="triggerFileInput"><el-icon>
                     <CirclePlus />
                   </el-icon>添加文件</el-button>
               </div>
             </div>
           </div>
           <div class="fileAction">
-            <el-button class="btn" size="large" type="primary" @click="uploadFiles"><el-icon>
+            <el-button class="btn" size="large" type="primary" @click="uploadFiles" :disabled="isButtonDisabled"><el-icon>
                 <DocumentAdd />
               </el-icon>上传文件</el-button>
-            <el-button class="btn" size="large" type="primary" @click="detection"><el-icon>
+            <el-button class="btn" size="large" type="primary" @click="detection" :disabled="isButtonDisabled"><el-icon>
                 <Loading />
               </el-icon>启动检测</el-button>
-            <el-button class="btn" size="large" type="primary" @click="transcription"><el-icon>
+            <el-button class="btn" size="large" type="primary" @click="transcription" :disabled="isButtonDisabled"><el-icon>
                 <EditPen />
               </el-icon>启动转写</el-button>
           </div>
@@ -121,7 +121,7 @@
             <el-table-column label="时长" align="center" prop="total_voice" show-overflow-tooltip />
             <el-table-column label="有效时长" align="center" prop="effective_voice" />
             <el-table-column label="语种" align="center" prop="language" />
-            <el-table-column label="处理状态" align="center" prop="status" />
+            <el-table-column label="处理状态" align="center" prop="step" />
 
             <el-table-column label="操作" align="center" width="500">
               <!-- 你可以在这里放操作按钮 -->
@@ -193,11 +193,11 @@
 <script lang="ts" setup>
 import { ref, computed, reactive, nextTick, onMounted, watch, onActivated, onUnmounted } from "vue";
 import type { TabsPaneContext } from "element-plus";
-import { ArrowDown } from "@element-plus/icons-vue";
+import { ArrowDown, Document, CirclePlus, SuccessFilled, CircleClose, DocumentAdd, Loading, EditPen, View, Download, Search, MuteNotification } from "@element-plus/icons-vue";
 import TableSearch from "@/components/operation-search.vue";
 import { useRouter, useRoute } from "vue-router";
 import { getTaskDetail, uploadTask, workflow,getFileProgress,getFileTranscriptionProgress,getTaskStatistics } from "@/api/task";
-import { Document, Paragraph, Packer, TextRun } from 'docx';
+import { Document as DocxDocument, Paragraph, Packer, TextRun } from 'docx';
 const id = ref("");
 const isHover = ref(false);
 const selectedFile = ref(null);
@@ -234,6 +234,12 @@ const isFileExists = (fileName) => {
   return uploadFileList.some(file => file.name === fileName);
 };
 
+const fileInput = ref(null);
+
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
 const handleFileChange = async (event) => {
   const files = event.target.files;
   if (files && files.length > 0) {
@@ -242,8 +248,8 @@ const handleFileChange = async (event) => {
       const file = files[i];
 
       // 检查文件类型
-      const fileType = file.type.toLowerCase();
-      const isAudioOrVideo = fileType.startsWith('audio/') || fileType.startsWith('video/');
+      const is_quick = file.type.toLowerCase();
+      const isAudioOrVideo = is_quick.startsWith('audio/') || is_quick.startsWith('video/');
 
       if (!isAudioOrVideo) {
         ElMessage.warning(`文件 "${file.name}" 不是音频或视频文件，已跳过`);
@@ -283,14 +289,20 @@ const deleteFile = (index) => {
   uploadFileList.splice(index, 1);
 };
 
+// 添加按钮状态控制变量
+const isButtonDisabled = ref(false);
+
+// 修改uploadFiles函数
 const uploadFiles = async () => {
-  console.log(1234567);
   if (selectedFiles.value.length === 0) {
     ElMessage.warning("请先选择文件");
     return;
   }
 
   try {
+    // 禁用按钮
+    isButtonDisabled.value = true;
+    
     // 构建文件对象
     const fileObjects = {};
     let index = 1;
@@ -308,20 +320,46 @@ const uploadFiles = async () => {
       // 清空已上传的文件列表
       uploadFileList.length = 0;
       selectedFiles.value = [];
+      // 启用按钮
+      isButtonDisabled.value = false;
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {
       ElMessage.error(res.data.msg || "文件上传失败");
+      // 上传失败时也启用按钮
+      isButtonDisabled.value = false;
     }
   } catch (error) {
     console.error("文件上传失败:", error);
     ElMessage.error("文件上传失败，请稍后重试");
+    // 发生错误时也启用按钮
+    isButtonDisabled.value = false;
   }
 };
 
 // 添加访问控制变量
 const canAccessDetection = ref(false);
 const canAccessTranscription = ref(false);
+
+// 添加step状态映射
+const stepStatusMap = {
+  0: '文件已上传，等待处理',
+  1: '正在提取音频',
+  2: '音频提取完成，等待降噪',
+  3: '正在音频降噪',
+  4: '音频降噪完成，等待下一步处理',
+  5: '正在快速识别',
+  6: '快速识别完成，等待用户选择是否转写',
+  7: '正在文本转写',
+  8: '所有处理完成',
+  9: '处理失败',
+  10: '任务暂停',
+  11: '未降噪的文本转写'
+};
+
+// 添加定时器变量
+let detectionTimer = null;
+let transcriptionTimer = null;
 
 // 修改检测函数
 const detection = async () => {
@@ -338,6 +376,23 @@ const detection = async () => {
     console.log(1799, res1);
     detectionFile.value = res1.data.data;
     
+    // 清除之前的定时器
+    if (detectionTimer) {
+      clearInterval(detectionTimer);
+    }
+    
+    // 设置定时器，每10秒请求一次进度
+    detectionTimer = setInterval(async () => {
+      const res = await getFileProgress(id.value);
+      if (res.data.code === 200) {
+        detectionFile.value = res.data.data;
+        // 如果进度达到100%，清除定时器
+        if (res.data.data.progress === 100) {
+          clearInterval(detectionTimer);
+        }
+      }
+    }, 10000);
+    
     // 等待2秒让服务器处理文件
     await new Promise(resolve => setTimeout(resolve, 2000));
     
@@ -348,15 +403,14 @@ const detection = async () => {
       // ElMessage.success("检测任务已启动");
     } else {
       ElMessage.error(res.data.msg || "启动检测失败");
+      clearInterval(detectionTimer);
     }
   } catch (error) {
     console.error("启动检测失败:", error);
     ElMessage.error("启动检测失败，请稍后重试");
+    clearInterval(detectionTimer);
   }
 };
-
-// 添加定时器来更新进度
-let progressTimer: any = null;
 
 // 修改转写函数
 const transcription = async () => {
@@ -374,21 +428,21 @@ const transcription = async () => {
     transitionFile.value = res1.data.data;
     
     // 清除之前的定时器
-    if (progressTimer) {
-      clearInterval(progressTimer);
+    if (transcriptionTimer) {
+      clearInterval(transcriptionTimer);
     }
     
-    // 设置定时器定期更新进度
-    progressTimer = setInterval(async () => {
+    // 设置定时器，每10秒请求一次进度
+    transcriptionTimer = setInterval(async () => {
       const res = await getFileTranscriptionProgress(id.value);
       if (res.data.code === 200) {
         transitionFile.value = res.data.data;
         // 如果进度达到100%，清除定时器
         if (res.data.data.progress === 100) {
-          clearInterval(progressTimer);
+          clearInterval(transcriptionTimer);
         }
       }
-    }, 3000);
+    }, 10000);
     
     // 等待2秒让服务器处理文件
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -400,17 +454,22 @@ const transcription = async () => {
       // ElMessage.success("转写任务已启动");
     } else {
       ElMessage.error(res.data.msg || "启动转写失败");
+      clearInterval(transcriptionTimer);
     }
   } catch (error) {
     console.error("启动转写失败:", error);
     ElMessage.error("启动转写失败，请稍后重试");
+    clearInterval(transcriptionTimer);
   }
 };
 
-// 组件卸载时清除定时器
+// 组件卸载时清除所有定时器
 onUnmounted(() => {
-  if (progressTimer) {
-    clearInterval(progressTimer);
+  if (detectionTimer) {
+    clearInterval(detectionTimer);
+  }
+  if (transcriptionTimer) {
+    clearInterval(transcriptionTimer);
   }
 });
 
@@ -432,17 +491,21 @@ const handleClose = (done: () => void) => {
 import { fetchFileData } from "@/api";
 // 查询相关
 const query = reactive({
-  fileType: "",
-  status: "",
+  is_quick: "",
+  step: "",
 });
 const handleSearch = () => {
+  console.log('触发搜索，当前搜索条件：', {
+    is_quick: query.is_quick,
+    step: query.step
+  });
   page.index = 1;
   getTaskDetail1();
 };
-const searchOpt = ref<FormOptionList[]>([
+const searchOpt = ref([
   {
     type: "select",
-    prop: "fileType",
+    prop: "is_quick",
     placeholder: "文件类型",
     activeValue: "全部文件",
     opts: [
@@ -452,14 +515,23 @@ const searchOpt = ref<FormOptionList[]>([
   },
   {
     type: "select",
-    prop: "status",
+    prop: "step",
     placeholder: "处理状态",
     activeValue: "全部",
     opts: [
       { label: "全部", value: "全部" },
-      { label: "已检测", value: "已检测" },
-      { label: "已转写", value: "已转写" },
-      { label: "已降噪", value: "已降噪" },
+      { label: "文件已上传，等待处理", value: "文件已上传，等待处理" },
+      { label: "正在提取音频", value: "正在提取音频" },
+      { label: "音频提取完成，等待降噪", value: "音频提取完成，等待降噪" },
+      { label: "正在音频降噪", value: "正在音频降噪" },
+      { label: "音频降噪完成，等待下一步处理", value: "音频降噪完成，等待下一步处理" },
+      { label: "正在快速识别", value: "正在快速识别" },
+      { label: "快速识别完成，等待用户选择是否转写", value: "快速识别完成，等待用户选择是否转写" },
+      { label: "正在文本转写", value: "正在文本转写" },
+      { label: "所有处理完成", value: "所有处理完成" },
+      { label: "处理失败", value: "处理失败" },
+      { label: "任务暂停", value: "任务暂停" },
+      { label: "未降噪的文本转写", value: "未降噪的文本转写" }
     ],
   },
 ]);
@@ -571,44 +643,63 @@ const page = reactive({
   size: 5,
   total: 0,
 });
+// 添加状态映射对象
+const statusToNumberMap = {
+  '文件已上传，等待处理': '0',
+  '正在提取音频': '1',
+  '音频提取完成，等待降噪': '2',
+  '正在音频降噪': '3',
+  '音频降噪完成，等待下一步处理': '4',
+  '正在快速识别': '5',
+  '快速识别完成，等待用户选择是否转写': '6',
+  '正在文本转写': '7',
+  '所有处理完成': '8',
+  '处理失败': '9',
+  '任务暂停': '10',
+  '未降噪的文本转写': '11'
+};
+
 const getTaskDetail1 = async () => {
   try {
-    const res = await getTaskDetail(id.value, page.index, page.size, {
-      search: query.fileType !== "全部文件" ? query.fileType : undefined,
+    // 打印搜索参数
+    console.log('搜索参数：', {
+      is_quick: query.is_quick,
+      step: query.step,
+      page: page.index,
+      size: page.size
+    });
+
+    const searchParams = {
+      is_quick: query.is_quick === "有效文件" ? "1" : "0",
+      step: query.step !== "全部" ? statusToNumberMap[query.step] : null,
       sort: "update_time",
       order: "desc"
-    });
+    };
+
+    // 打印发送到后端的参数
+    console.log('发送到后端的参数：', searchParams);
+
+    const res = await getTaskDetail(id.value, page.index, page.size, searchParams);
+    console.log('后端返回的原始数据：', res.data.data);
 
     if (res.data.code === 200) {
       let filteredData = res.data.data.list;
-      let totalData = res.data.data.list; // 保存原始数据用于计算总数
+      console.log('后端返回的列表数据：', filteredData);
+      console.log('后端返回的总数：', res.data.data.total);
 
-      // 处理文件类型筛选
-      if (query.fileType === "有效文件") {
-        filteredData = filteredData.filter(file =>
-          file.effective_voice &&
-          file.effective_voice !== "0" &&
-          file.effective_voice !== ""
-        );
-      }
-
-      // 处理状态筛选
-      if (query.status && query.status !== "全部") {
-        filteredData = filteredData.filter(file =>
-          file.status === query.status
-        );
-      }
-
-      // 确保每个文件对象都有id属性
+      // 确保每个文件对象都有id属性，并转换step为文字描述
       filteredData = filteredData.map(file => ({
         ...file,
-        id: file.id || file.file_id || file.task_id // 尝试不同的可能id字段
+        id: file.id || file.file_id || file.task_id,
+        step: stepStatusMap[file.step] || '未知状态'
       }));
 
-      console.log('设置到表格的数据：', filteredData);
+      console.log('处理后的表格数据：', filteredData);
       tableData.value = filteredData;
+      
       // 使用后端返回的总数
       page.total = res.data.data.total;
+      console.log('设置的分页总数：', page.total);
     } else if (res.data.code === 401) {
       router.push("/login");
     } else {
